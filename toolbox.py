@@ -8,17 +8,19 @@ from neural_net import ObservableNet
 
 def initialize_data():
     observable_net = ObservableNet(784)
-    observable_net.add_layer(64, name='hidden')
+    # observable_net.add_layer(784, name='hidden')
+    observable_net.add_layer(784, name='hidden2')
     observable_net.add_layer(10, name='output')
     observable_net.train()
 
-    return observable_net.gradients_with_weights
+    return observable_net.weights, observable_net.gradients, \
+           [observable_net.create_time_vectors('gradient', layer) for layer in range(2)]
 
 
 class Window(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.data = initialize_data()
+        self.weights, self.gradients, tms = initialize_data()
         self.layer = 0
         self.epoch = 0
         self.vis = 'gradient'
@@ -26,6 +28,7 @@ class Window(QtWidgets.QWidget):
         self.canvas = FigureCanvasQTAgg(self.figure)
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
         self.init_ui()
+        print()
 
     def init_ui(self):
         self.setMinimumHeight(400)
@@ -95,7 +98,7 @@ class Window(QtWidgets.QWidget):
         layer_selection = QtWidgets.QComboBox()
         layout.addWidget(layer_selection)
 
-        layer_selection.addItems(self.data['layer'].apply(str).unique())
+        layer_selection.addItems(self.weights['layer'].apply(str).unique())
         layer_selection.currentIndexChanged.connect(self.change_layer)
 
         epoch_label = QtWidgets.QLabel('Epoch:')
@@ -103,16 +106,20 @@ class Window(QtWidgets.QWidget):
         epoch_selection = QtWidgets.QComboBox()
         layout.addWidget(epoch_selection)
 
-        epoch_selection.addItems(self.data['epoch'].apply(str).unique())
+        epoch_selection.addItems(self.weights['epoch'].apply(str).unique())
         epoch_selection.currentIndexChanged.connect(self.change_epoch)
 
     def plot(self):
         ax = self.figure.add_subplot(111)
-        data = self.data
-        series = data.loc[(data['epoch'] == self.epoch) & (data['layer'] == self.layer)]
-        weights = series[self.vis].tolist()
+        if self.vis == 'gradient':
+            series = self.gradients.loc[
+                (self.gradients['epoch'] == self.epoch) & (self.gradients['layer'] == self.layer)]
+        else:
+            series = self.weights.loc[
+                (self.weights['epoch'] == self.epoch) & (self.weights['layer'] == self.layer)]
+        values = series[self.vis].tolist()
         ax.clear()
-        ax.imshow(weights[0], interpolation='nearest', cmap='RdBu', aspect='auto')
+        ax.imshow(values[0], interpolation='nearest', cmap='RdBu', aspect='auto')
         self.canvas.draw()
 
 
@@ -120,3 +127,4 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     app_window = Window()
     sys.exit(app.exec_())
+
