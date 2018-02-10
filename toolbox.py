@@ -2,6 +2,7 @@ from PyQt5 import QtWidgets, QtCore
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 import sys
+import numpy as np
 
 from neural_net import ObservableNet
 
@@ -20,7 +21,7 @@ def initialize_data():
 class Window(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.weights, self.gradients, tms = initialize_data()
+        self.weights, self.gradients, self.tms = initialize_data()
         self.layer = 0
         self.epoch = 0
         self.vis = 'gradient'
@@ -109,7 +110,7 @@ class Window(QtWidgets.QWidget):
         epoch_selection.addItems(self.weights['epoch'].apply(str).unique())
         epoch_selection.currentIndexChanged.connect(self.change_epoch)
 
-    def plot(self):
+    def plot_heatmap(self):
         ax = self.figure.add_subplot(111)
         if self.vis == 'gradient':
             series = self.gradients.loc[
@@ -122,9 +123,19 @@ class Window(QtWidgets.QWidget):
         ax.imshow(values[0], interpolation='nearest', cmap='RdBu', aspect='auto')
         self.canvas.draw()
 
+    def plot(self):
+        ax = self.figure.add_subplot(111)
+        ax.clear()
+        a = list()
+        for row in self.tms[0]:
+            x = row.flatten()
+            a.append(x)
+        a = np.array(a)
+        ax.imshow(a, aspect='auto')
+        self.canvas.draw()
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     app_window = Window()
     sys.exit(app.exec_())
-

@@ -30,7 +30,7 @@ class ObservableNet:
 
         return gradients, apply_operation, y_, accuracy
 
-    def train(self, epochs=30, learning_rate=0.00001):
+    def train(self, epochs=2, learning_rate=0.00001):
         mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
         gradients, apply_operation, y_, accuracy = self.create_net(learning_rate)
@@ -41,7 +41,7 @@ class ObservableNet:
                 print('Starting epoch: ' + str(epoch))
                 save_grad_weights = []
                 for i in range(50):
-                    #ToDO Better method for shuffling
+                    # ToDO Better method for shuffling
                     batch = mnist.train.next_batch(1000)
                     batch_train, batch_label = batch[0], batch[1]
                     grad_weights = sess.run(gradients, feed_dict={self.first_input: batch_train, y_: batch_label})
@@ -73,14 +73,18 @@ class ObservableNet:
         self.agg_gradients = None
 
     def create_time_vectors(self, prop, layer):
-        time_vectors = list()
         if prop == 'gradient':
             data = self.gradients
         else:
             data = self.weights
 
+        time_vectors = list()
         data_epochs = data.loc[(data['layer'] == layer)][prop].tolist()
-        for row in range(len(data_epochs[0])):
-            vector = np.array(tuple([entry[row] for entry in data_epochs ]))
-            time_vectors.append(vector.T)
+        for row in range(data_epochs[0].shape[0]):
+            time_vector_rows = list()
+            for col in range(data_epochs[0].shape[1]):
+                vector = np.array(tuple([entry[row][col] for entry in data_epochs]))
+                time_vector_rows.append(vector.T)
+            time_vector_rows = np.array(time_vector_rows)
+            time_vectors.append(time_vector_rows)
         return time_vectors
