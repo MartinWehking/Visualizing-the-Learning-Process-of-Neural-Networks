@@ -30,7 +30,7 @@ class ObservableNet:
 
         return gradients, apply_operation, y_, accuracy
 
-    def train(self, epochs=2, learning_rate=0.00001):
+    def train(self, epochs=1, learning_rate=0.00001):
         mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
         gradients, apply_operation, y_, accuracy = self.create_net(learning_rate)
@@ -88,3 +88,19 @@ class ObservableNet:
             time_vector_rows = np.array(time_vector_rows)
             time_vectors.append(time_vector_rows)
         return time_vectors
+
+
+def normalize_time_vectors(time_vectors):
+    epochs = len(time_vectors[0][0][0])
+    normalized_time_vectors = list()
+    for layer in time_vectors:
+        normalized_layer = list()
+        for row in layer:
+            normalized_row = list()
+            for time_vector in row:
+                normalized_vector = np.linalg.norm(time_vector)
+                normalized_row.append(normalized_vector)
+            array = np.array(normalized_row)
+            normalized_layer.append(np.reshape(array, newshape=[len(array), epochs]))
+        normalized_time_vectors.append(normalized_layer)
+    return normalized_time_vectors

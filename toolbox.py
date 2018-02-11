@@ -1,6 +1,8 @@
 from PyQt5 import QtWidgets, QtCore
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from neural_net import normalize_time_vectors
+import matplotlib.ticker
 import sys
 import numpy as np
 
@@ -15,13 +17,14 @@ def initialize_data():
     observable_net.train()
 
     return observable_net.weights, observable_net.gradients, \
-           [observable_net.create_time_vectors('gradient', layer) for layer in range(2)]
+           [observable_net.create_time_vectors('weight', layer) for layer in range(2)]
 
 
 class Window(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.weights, self.gradients, self.tms = initialize_data()
+        self.weights, self.gradients, self.time_vectors = initialize_data()
+        self.norm = normalize_time_vectors(self.time_vectors)
         self.layer = 0
         self.epoch = 0
         self.vis = 'gradient'
@@ -112,6 +115,9 @@ class Window(QtWidgets.QWidget):
 
     def plot_heatmap(self):
         ax = self.figure.add_subplot(111)
+        ax.clear()
+        self.figure.subplots_adjust(left=0, right=1, bottom=0, top=1)
+
         if self.vis == 'gradient':
             series = self.gradients.loc[
                 (self.gradients['epoch'] == self.epoch) & (self.gradients['layer'] == self.layer)]
@@ -119,19 +125,18 @@ class Window(QtWidgets.QWidget):
             series = self.weights.loc[
                 (self.weights['epoch'] == self.epoch) & (self.weights['layer'] == self.layer)]
         values = series[self.vis].tolist()
-        ax.clear()
-        ax.imshow(values[0], interpolation='nearest', cmap='RdBu', aspect='auto')
+        ax.imshow(values[0], interpolation='nearest', aspect='auto')
         self.canvas.draw()
 
     def plot(self):
         ax = self.figure.add_subplot(111)
         ax.clear()
         a = list()
-        for row in self.tms[0]:
+        for row in self.time_vectors[0]:
             x = row.flatten()
             a.append(x)
         a = np.array(a)
-        ax.imshow(a, aspect='auto')
+        ax.imshow(a, aspect='auto', cmap='RdGy', interpolation='None')
         self.canvas.draw()
 
 
