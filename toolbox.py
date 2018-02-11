@@ -12,7 +12,7 @@ from neural_net import ObservableNet
 def initialize_data():
     observable_net = ObservableNet(784)
     # observable_net.add_layer(784, name='hidden')
-    observable_net.add_layer(784, name='hidden2')
+    observable_net.add_layer(20, name='hidden2')
     observable_net.add_layer(10, name='output')
     observable_net.train()
 
@@ -132,7 +132,7 @@ class Window(QtWidgets.QWidget):
         ax = self.figure.add_subplot(111)
         ax.clear()
         a = list()
-        for row in self.time_vectors[0]:
+        for row in self.time_vectors[1]:
             x = row.flatten()
             a.append(x)
         a = np.array(a)
