@@ -35,6 +35,7 @@ class Window(QtWidgets.QWidget):
         self.figure = Figure()
         self.canvas = FigureCanvasQTAgg(self.figure)
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
+        normalize_time_vectors(self.time_vectors)
         self.init_ui()
 
     def init_ui(self):
@@ -135,8 +136,8 @@ class Window(QtWidgets.QWidget):
         ax = self.figure.add_subplot(111)
         ax.clear()
         a = list()
-        epochs = len(self.time_vectors[1][0][0])
-        for row in self.time_vectors[1]:
+        epochs = len(self.norm[1][0][0])
+        for row in self.norm[1]:
             x = row.flatten()
             a.append(x)
         a = np.array(a)
@@ -144,8 +145,6 @@ class Window(QtWidgets.QWidget):
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         ax.grid(b=True, which='major', color='k', axis='x')
         ax.yaxis.set_minor_locator(plt.MultipleLocator(1))
-        #ax.grid(b=True, which='minor', color='k', axis='y', linestyle='--', linewidth=0.1)
-        #ax.xaxis.set_minor_locator(plt.MultipleLocator(1/epochs))
         ax.xaxis.set_major_formatter(plt.FormatStrFormatter('%.0f'))
         ax.imshow(a, aspect='auto', cmap='RdGy', interpolation='None', extent=[0, int(len(a[0]) / epochs), len(a), 0])
         self.canvas.draw()

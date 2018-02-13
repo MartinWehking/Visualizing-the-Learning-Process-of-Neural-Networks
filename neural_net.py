@@ -6,6 +6,7 @@ import tensorflow as tf
 from sklearn.preprocessing import normalize
 from sklearn.cluster import DBSCAN
 
+
 class ObservableNet:
     def __init__(self, input_units):
         self.previous_input = self.first_input = tf.layers.Input(shape=[input_units])
@@ -92,15 +93,34 @@ class ObservableNet:
 
 
 def normalize_time_vectors(time_vectors):
-    #min-max normalization
     normalized_time_vectors = list()
     for layer in time_vectors:
         normalized_layer = list()
         for row in layer:
-            normalized_row = normalize(row, axis=1, norm='l2')
-            normalized_layer.append(normalized_row)
+            normalized_row = list()
+            for time_vector in row:
+                normalized_row.append(normalize_time_vector(time_vector))
+            normalized_layer.append(np.array(normalized_row))
         normalized_time_vectors.append(normalized_layer)
     return normalized_time_vectors
+
+
+def normalize_time_vector(time_vector):
+    minimum = np.min(time_vector)
+    maximum = np.max(time_vector)
+    normalized_time_vector = list()
+    for element in time_vector:
+        if element < 0:
+            if not minimum == 0:
+                normalized_time_vector.append(-element / minimum)
+            else:
+                normalized_time_vector.append(element)
+        else:
+            if not maximum == 0:
+                normalized_time_vector.append(element / maximum)
+            else:
+                normalized_time_vector.append(element)
+    return np.array(normalized_time_vector)
 
 
 def cluster_time_vectors(time_vectors):
