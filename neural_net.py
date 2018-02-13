@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from sklearn.preprocessing import normalize
-
+from sklearn.cluster import DBSCAN
 
 class ObservableNet:
     def __init__(self, input_units):
@@ -31,7 +31,7 @@ class ObservableNet:
 
         return gradients, apply_operation, y_, accuracy
 
-    def train(self, epochs=2, learning_rate=0.00001):
+    def train(self, epochs=5, learning_rate=0.0001):
         mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
         gradients, apply_operation, y_, accuracy = self.create_net(learning_rate)
@@ -92,6 +92,7 @@ class ObservableNet:
 
 
 def normalize_time_vectors(time_vectors):
+    #min-max normalization
     normalized_time_vectors = list()
     for layer in time_vectors:
         normalized_layer = list()
@@ -100,3 +101,7 @@ def normalize_time_vectors(time_vectors):
             normalized_layer.append(normalized_row)
         normalized_time_vectors.append(normalized_layer)
     return normalized_time_vectors
+
+
+def cluster_time_vectors(time_vectors):
+    DBSCAN()
