@@ -35,14 +35,16 @@ class Window(QtWidgets.QWidget):
 
     def initialize_observable_net(self):
         observable_net = ObservableNet(784)
-        observable_net.add_layer(784, name='hidden')
+        observable_net.add_layer(30, name='hidden')
+        observable_net.add_layer(30, name='hidden2')
+        #observable_net.add_layer(20, name='hidden3')
         observable_net.add_layer(10, name='output', activation='linear')
         observable_net.train()
 
         self.weights = observable_net.weights
         self.gradients = observable_net.gradients
-        self.time_vectors_gradients = [observable_net.create_time_vectors('gradient', layer) for layer in range(2)]
-        self.time_vectors_weights = [observable_net.create_time_vectors('weight', layer) for layer in range(2)]
+        self.time_vectors_gradients = [observable_net.create_time_vectors('gradient', layer) for layer in range(3)]
+        self.time_vectors_weights = [observable_net.create_time_vectors('weight', layer) for layer in range(3)]
 
     def init_ui(self):
         self.setMinimumHeight(400)

@@ -11,6 +11,7 @@ class ObservableNet:
     def __init__(self, input_units):
         self.previous_input = self.first_input = tf.layers.Input(shape=[input_units])
         self.agg_gradients = None
+        self.mini_batches = 50
         self.gradients = pd.DataFrame(columns=['gradient', 'epoch', 'layer'])
         self.weights = pd.DataFrame(columns=['weight', 'epoch', 'layer'])
 
@@ -54,7 +55,7 @@ class ObservableNet:
                 save_grad_weights = []
                 rd.shuffle(indices)
                 # sess.run([train_image_batch, train_label_batch])
-                for i in range(50):
+                for i in range(self.mini_batches):
                     train_indices = indices[i * 1000: (i + 1) * 1000]
                     train_data = [complete_train_data[i] for i in train_indices]
                     train_labels = [complete_train_labels[i] for i in train_indices]
@@ -68,11 +69,11 @@ class ObservableNet:
                 self.save_gradients(epoch)
 
     def save_weights(self, grad_weights, epoch):
-        weights = [(grad_weight[0], epoch, layer) for layer, grad_weight in enumerate(grad_weights)]
+        weights = [(grad_weight[1], epoch, layer) for layer, grad_weight in enumerate(grad_weights)]
         self.weights = self.weights.append(pd.DataFrame(weights, columns=['weight', 'epoch', 'layer']))
 
     def add_gradients(self, grad_weights):
-        gradients = [grad_weight[1] for grad_weight in grad_weights]
+        gradients = [grad_weight[0] for grad_weight in grad_weights]
         if self.agg_gradients is None:
             self.agg_gradients = gradients
         else:
@@ -80,7 +81,8 @@ class ObservableNet:
 
     def save_gradients(self, epoch):
         #    ToDo average!
-        self.agg_gradients = [(agg_gradient, epoch, layer) for layer, agg_gradient in enumerate(self.agg_gradients)]
+        self.agg_gradients = [(agg_gradient / self.mini_batches, epoch, layer)
+                              for layer, agg_gradient in enumerate(self.agg_gradients)]
         self.gradients = self.gradients.append(pd.DataFrame(self.agg_gradients, columns=['gradient', 'epoch', 'layer']))
         self.agg_gradients = None
 
