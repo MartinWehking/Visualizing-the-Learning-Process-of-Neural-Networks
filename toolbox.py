@@ -4,6 +4,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationTool
 from sklearn.decomposition import PCA
 from matplotlib.ticker import MaxNLocator
 from matplotlib import pyplot as plt
+from networkx import Graph, draw_networkx, get_node_attributes
 
 import sys
 import numpy as np
@@ -142,6 +143,10 @@ class Window(QtWidgets.QWidget):
         apply_button.pressed.connect(self.change_size)
         layout.addWidget(apply_button)
 
+        draw_unclustered_vectors = QtWidgets.QPushButton('Draw Time-Vectors')
+        draw_unclustered_vectors.pressed.connect(self.plot_time_vectors)
+        layout.addWidget(draw_unclustered_vectors)
+
         # epoch_label = QtWidgets.QLabel('Epoch:')
         # layout.addWidget(epoch_label)
         # epoch_selection = QtWidgets.QComboBox()
@@ -203,6 +208,24 @@ class Window(QtWidgets.QWidget):
         ax.imshow(a, aspect='auto', cmap='RdGy', interpolation='None', extent=[0, int(len(a[0]) / epochs), len(a), 0])
         self.canvas.draw()
 
+    def plot_time_vectors(self):
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        ax.clear()
+
+        if self.vis == 'gradient':
+            tl = self.time_vectors_gradients[self.layer]
+        else:
+            tl = self.time_vectors_weights[self.layer]
+
+        time_vectors = tl[0]
+        for time_vector in tl[1:]:
+            time_vectors = np.vstack([time_vectors, time_vector])
+        pca = PCA(n_components=2).fit_transform(time_vectors)
+        ax.scatter(pca[:,0], pca[:,1])
+        self.canvas.draw()
+
+
     def visualize_time_vectors(self, layer):
         vectors = list()
         for row in self.time_vectors[layer]:
@@ -210,6 +233,32 @@ class Window(QtWidgets.QWidget):
                 vectors.append(vector)
         representations = PCA().fit_transform(vectors)
         plt.scatter(representations[:, 0], representations[:, 1])
+
+def visualize_embeddings_networkx(embeddings, step=None):
+    if step is None:
+        step = max(embeddings['step'].tolist())
+    vis_embeddings = embeddings[str(step)]
+    pca_embeddings = PCA(n_components=2).fit_transform(vis_embeddings.tolist())
+    embedding_graph = Graph()
+    color_map = []
+    for index, embedding in enumerate(pca_embeddings):
+        node_number = embeddings['node'].tolist()[index]
+        embedding_graph.add_node(node_number, pos=embedding)
+        node_step = embeddings['step'].tolist()[index]
+        color_map.append(int(10 * node_step))
+    # edge_colors = []
+    # if original_graph is not None:
+    #    for edge in original_graph.edges():
+    #       embedding_graph.add_edge(edge[0], edge[1])
+    #       if mark_step:
+    #           if str(edge[0]) in frequent_nodes or str(edge[1]) in frequent_nodes:
+    #               edge_colors.append(0.1)
+    #           else:
+    #             edge_colors.append(0.2)
+    #
+    draw_networkx(embedding_graph, pos=get_node_attributes(embedding_graph, 'pos'),
+                  node_color=color_map, font_color='r')
+    plt.show()
 
 
 if __name__ == "__main__":

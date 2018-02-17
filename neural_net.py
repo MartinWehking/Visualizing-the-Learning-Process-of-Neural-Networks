@@ -36,7 +36,7 @@ class ObservableNet:
 
         return gradients, apply_operation, y_, accuracy
 
-    def train(self, epochs=2, learning_rate=0.001):
+    def train(self, epochs=10, learning_rate=0.001):
 
         mnist = tf.contrib.learn.datasets.load_dataset("mnist")
         complete_train_data = mnist.train.images  # Returns np.array
@@ -101,6 +101,9 @@ class ObservableNet:
             time_vectors.append(time_vector_rows)
         return time_vectors
 
+
+def cluster_time_vectors(self, time_vectors):
+    print()
 
 def normalize_time_vectors(time_vectors):
     #ToDo Very Slow. Needs to be changed.
