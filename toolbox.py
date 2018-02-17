@@ -1,7 +1,6 @@
 from PyQt5 import QtWidgets, QtCore
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
-from neural_net import normalize_time_vectors
 from sklearn.decomposition import PCA
 from matplotlib.ticker import MaxNLocator
 from matplotlib import pyplot as plt
@@ -11,6 +10,7 @@ import numpy as np
 
 from neural_net import ObservableNet
 
+
 class Window(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
@@ -18,6 +18,12 @@ class Window(QtWidgets.QWidget):
         self.time_vectors_weights = None
         self.weights = None
         self.gradients = None
+
+        self.l1_from = None
+        self.l1_to = None
+        self.l2_from = None
+        self.l2_to = None
+
         self.initialize_observable_net()
         self.layer = self.epoch = 0
         self.vis = 'gradient'
@@ -110,8 +116,8 @@ class Window(QtWidgets.QWidget):
 
         l1_selection = QtWidgets.QGroupBox()
         l1_selection_box = QtWidgets.QHBoxLayout()
-        l1_from_selection = QtWidgets.QLineEdit('0')
-        l1_to_selection = QtWidgets.QLineEdit('784')
+        self.l1_from = l1_from_selection = QtWidgets.QLineEdit('0')
+        self.l1_to = l1_to_selection = QtWidgets.QLineEdit('784')
         l1_selection.setLayout(l1_selection_box)
         l1_selection_box.addWidget(l1_from_selection)
         l1_selection_box.addWidget(QtWidgets.QLabel(':'))
@@ -119,8 +125,8 @@ class Window(QtWidgets.QWidget):
 
         l2_selection = QtWidgets.QGroupBox()
         l2_selection_box = QtWidgets.QHBoxLayout()
-        l2_from_selection = QtWidgets.QLineEdit('0')
-        l2_to_selection = QtWidgets.QLineEdit('784')
+        self.l2_from = l2_from_selection = QtWidgets.QLineEdit('0')
+        self.l2_to = l2_to_selection = QtWidgets.QLineEdit('784')
         l2_selection.setLayout(l2_selection_box)
         l2_selection_box.addWidget(l2_from_selection)
         l2_selection_box.addWidget(QtWidgets.QLabel(':'))
@@ -131,6 +137,10 @@ class Window(QtWidgets.QWidget):
         layout.addWidget(l1_selection)
         layout.addWidget(QtWidgets.QLabel('Neurons of Layer 1:'))
         layout.addWidget(l2_selection)
+
+        apply_button = QtWidgets.QPushButton('Apply')
+        apply_button.pressed.connect(self.change_size)
+        layout.addWidget(apply_button)
 
         # epoch_label = QtWidgets.QLabel('Epoch:')
         # layout.addWidget(epoch_label)
@@ -157,19 +167,31 @@ class Window(QtWidgets.QWidget):
         ax.imshow(values[0], interpolation='nearest', aspect='auto')
         self.canvas.draw()
 
-    def plot(self):
-        self.figure.clear()
-        ax = self.figure.add_subplot(111)
-        ax.clear()
-        a = list()
+    def change_size(self):
+        self.plot(int(self.l1_from.text()), int(self.l1_to.text()), int(self.l2_from.text()), int(self.l2_to.text()))
+
+    def plot(self, l1_from=0, l1_to=None, l2_from=0, l2_to=None):
         if self.vis == 'gradient':
             time_vectors = self.time_vectors_gradients
         else:
             time_vectors = self.time_vectors_weights
+
+        if l1_to is None:
+            l1_to = len(time_vectors[self.layer])
+        if l2_to is None:
+            l2_to = len(time_vectors[self.layer][0]) * len(time_vectors[self.layer][0][0])
+        else:
+            l2_to = l2_to * len(time_vectors[self.layer][0][0])
+
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        ax.clear()
+        a = list()
         epochs = len(time_vectors[self.layer][0][0])
-        for row in time_vectors[self.layer]:
-            x = row.flatten()
-            a.append(x)
+        for i, row in enumerate(time_vectors[self.layer]):
+            if l1_from <= i <= l1_to:
+                x = row.flatten()[l2_from:l2_to]
+                a.append(x)
         a = np.array(a)
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
@@ -179,7 +201,6 @@ class Window(QtWidgets.QWidget):
         ax.yaxis.set_minor_locator(plt.MultipleLocator(1))
         ax.xaxis.set_major_formatter(plt.FormatStrFormatter('%.0f'))
         ax.imshow(a, aspect='auto', cmap='RdGy', interpolation='None', extent=[0, int(len(a[0]) / epochs), len(a), 0])
-        ax
         self.canvas.draw()
 
     def visualize_time_vectors(self, layer):
