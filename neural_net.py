@@ -5,6 +5,7 @@ import pandas as pd
 import tensorflow as tf
 import random as rd
 from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import MinMaxScaler
 
 
 class ObservableNet:
@@ -37,7 +38,7 @@ class ObservableNet:
 
         return gradients, apply_operation, y_, accuracy
 
-    def train(self, epochs=10, learning_rate=0.001):
+    def train(self, epochs=10, learning_rate=0.001, bad_training=False):
 
         mnist = tf.contrib.learn.datasets.load_dataset("mnist")
         complete_train_data = mnist.train.images  # Returns np.array
@@ -58,9 +59,12 @@ class ObservableNet:
                 for i in range(self.mini_batches):
                     train_indices = indices[i * 1000: (i + 1) * 1000]
                     train_data = [complete_train_data[i] for i in train_indices]
+                    if bad_training:
+                        rd.shuffle(train_indices)
                     train_labels = [complete_train_labels[i] for i in train_indices]
-                    grad_weights, s = sess.run([gradients, apply_operation], feed_dict={self.first_input: train_data, y_:
-                        train_labels})
+                    grad_weights, s = sess.run([gradients, apply_operation],
+                                               feed_dict={self.first_input: train_data, y_:
+                                                   train_labels})
                     save_grad_weights = [grad_weight for i, grad_weight in enumerate(grad_weights) if
                                          i % 2 == 0]
                     self.add_gradients(save_grad_weights)
@@ -104,41 +108,31 @@ class ObservableNet:
         return time_vectors
 
 
-def cluster_time_vectors(self, time_vectors):
-    print()
-
 def normalize_time_vectors(time_vectors):
-    #ToDo Very Slow. Needs to be changed.
     normalized_time_vectors = list()
     for layer in time_vectors:
         normalized_layer = list()
         for row in layer:
-            #normalized_row = list()
-            #for time_vector in row:
-            #    normalized_row.append(normalize_time_vector(time_vector))
-            normalized_layer.append(np.apply_along_axis())
+            #normalized_row = np.apply_along_axis(lambda x: MinMaxScaler().fit_transform(np.asmatrix(x)), 0, row)
+            row = np.asmatrix(row)
+            #normalized_row = (row - np.min(row, axis=1)) / (np.max(row, axis=1) - np.min(row, axis=1))
+            normalized_row = list()
+            for time_vector in row:
+                scaler = MinMaxScaler()
+                scaler.fit(time_vector)
+                normalized_row.append(scaler.transform(time_vector))
             normalized_layer.append(np.array(normalized_row))
         normalized_time_vectors.append(normalized_layer)
     return normalized_time_vectors
 
-
-def normalize_time_vector(time_vector):
-    minimum = np.min(time_vector)
-    maximum = np.max(time_vector)
-    normalized_time_vector = list()
-    for element in time_vector:
-        if element < 0:
-            if not minimum == 0:
-                normalized_time_vector.append(-element / minimum)
-            else:
-                normalized_time_vector.append(element)
-        else:
-            if not maximum == 0:
-                normalized_time_vector.append(element / maximum)
-            else:
-                normalized_time_vector.append(element)
-    return np.array(normalized_time_vector)
+def get_all_time_vectors(time_vectors):
+    all_time_vectors = list()
+    for row in time_vectors:
+        for time_vector in row:
+            all_time_vectors.append(time_vector)
+    return all_time_vectors
 
 
 def cluster_time_vectors(time_vectors):
-    DBSCAN()
+    clustered_vectors = DBSCAN(eps=0.01).fit_predict(time_vectors)
+    return clustered_vectors
