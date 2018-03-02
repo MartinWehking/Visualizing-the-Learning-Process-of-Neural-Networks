@@ -29,7 +29,7 @@ class ObservableNet:
 
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.previous_input,
                                                                          labels=y))
-        optimizer = tf.train.AdamOptimizer(learning_rate)
+        optimizer = tf.train.GradientDescentOptimizer(learning_rate)
         gradients = optimizer.compute_gradients(loss)
         apply_operation = optimizer.apply_gradients(gradients)
 
@@ -38,7 +38,7 @@ class ObservableNet:
 
         return gradients, apply_operation, y_, accuracy
 
-    def train(self, epochs=10, learning_rate=0.001, bad_training=False):
+    def train(self, epochs=10, learning_rate=0.1, bad_training=False):
 
         mnist = tf.contrib.learn.datasets.load_dataset("mnist")
         complete_train_data = mnist.train.images  # Returns np.array
@@ -113,9 +113,9 @@ def normalize_time_vectors(time_vectors):
     for layer in time_vectors:
         normalized_layer = list()
         for row in layer:
-            #normalized_row = np.apply_along_axis(lambda x: MinMaxScaler().fit_transform(np.asmatrix(x)), 0, row)
+            # normalized_row = np.apply_along_axis(lambda x: MinMaxScaler().fit_transform(np.asmatrix(x)), 0, row)
             row = np.asmatrix(row)
-            #normalized_row = (row - np.min(row, axis=1)) / (np.max(row, axis=1) - np.min(row, axis=1))
+            # normalized_row = (row - np.min(row, axis=1)) / (np.max(row, axis=1) - np.min(row, axis=1))
             normalized_row = list()
             for time_vector in row:
                 scaler = MinMaxScaler()
@@ -125,6 +125,7 @@ def normalize_time_vectors(time_vectors):
         normalized_time_vectors.append(normalized_layer)
     return normalized_time_vectors
 
+
 def get_all_time_vectors(time_vectors):
     all_time_vectors = list()
     for row in time_vectors:
@@ -133,6 +134,13 @@ def get_all_time_vectors(time_vectors):
     return all_time_vectors
 
 
-def cluster_time_vectors(time_vectors):
-    clustered_vectors = DBSCAN(eps=0.01).fit_predict(time_vectors)
+def cluster_time_vectors(time_vectors, epsilon):
+    clustered_vectors = DBSCAN(eps=epsilon).fit_predict(time_vectors)
     return clustered_vectors
+
+
+def sum_columns(time_vectors):
+    end_vector = np.copy(time_vectors[0])
+    for time_vector in time_vectors[1:]:
+        end_vector += time_vector
+    return end_vector

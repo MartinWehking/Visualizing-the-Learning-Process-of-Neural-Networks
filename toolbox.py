@@ -5,11 +5,12 @@ from sklearn.decomposition import PCA
 from matplotlib.ticker import MaxNLocator
 from matplotlib import pyplot as plt
 from networkx import Graph, draw_networkx, get_node_attributes
+from functools import partial
 
 import sys
 import numpy as np
 
-from neural_net import ObservableNet, normalize_time_vectors, get_all_time_vectors, cluster_time_vectors
+from neural_net import ObservableNet, normalize_time_vectors, get_all_time_vectors, cluster_time_vectors, sum_columns
 
 
 class Window(QtWidgets.QWidget):
@@ -28,8 +29,9 @@ class Window(QtWidgets.QWidget):
         self.l2_from = None
         self.l2_to = None
 
-        self.initialize_observable_net()
         self.layer = self.epoch = 0
+        self.epsilon = 0.01
+        self.initialize_observable_net()
         self.vis = 'gradient'
         self.s_normalized = False
 
@@ -43,8 +45,10 @@ class Window(QtWidgets.QWidget):
 
     def initialize_observable_net(self):
         observable_net = ObservableNet(784)
-        observable_net.add_layer(50, name='hidden')
-        observable_net.add_layer(70, name='hidden2')
+        #observable_net.add_layer(50, name='hidden')
+        #observable_net.add_layer(10, name='hidden2')
+        observable_net.add_layer(2, name='hidden3')
+        observable_net.add_layer(2, name='hidden4')
         observable_net.add_layer(10, name='output', activation='linear')
         observable_net.train()
 
@@ -52,8 +56,8 @@ class Window(QtWidgets.QWidget):
         self.gradients = observable_net.gradients
         self.time_vectors_gradients = [observable_net.create_time_vectors('gradient', layer) for layer in range(3)]
         self.time_vectors_weights = [observable_net.create_time_vectors('weight', layer) for layer in range(3)]
-        self.normalized_weights = normalize_time_vectors(self.time_vectors_weights)
-        self.normalized_gradients = normalize_time_vectors(self.time_vectors_gradients)
+        #self.normalized_weights = normalize_time_vectors(self.time_vectors_weights)
+        #self.normalized_gradients = normalize_time_vectors(self.time_vectors_gradients)
 
     def init_ui(self):
         self.setMinimumHeight(400)
@@ -87,6 +91,11 @@ class Window(QtWidgets.QWidget):
     def change_layer(self, value):
         self.layer = value
         self.plot()
+
+    def change_epsilon(self, value):
+        print('hi')
+        self.epsilon = value
+        self.plot_time_vectors()
 
     def change_epoch(self, value):
         self.epoch = value
@@ -158,9 +167,15 @@ class Window(QtWidgets.QWidget):
         draw_unclustered_vectors.pressed.connect(self.plot_time_vectors)
         layout.addWidget(draw_unclustered_vectors)
 
-        normalize_button = QtWidgets.QPushButton('Show normalized Time-Vectors')
-        normalize_button.pressed.connect(self.show_normalized)
-        layout.addWidget(normalize_button)
+        layout.addWidget(QtWidgets.QLabel('Clustering Epsilon:'))
+        epsilon = QtWidgets.QLineEdit('0.01')
+        epsilon.returnPressed.connect(partial(self.change_epsilon, float(epsilon.text())))
+        layout.addWidget(epsilon)
+
+
+        #normalize_button = QtWidgets.QPushButton('Show normalized Time-Vectors')
+        #normalize_button.pressed.connect(self.show_normalized)
+        #layout.addWidget(normalize_button)
 
         # epoch_label = QtWidgets.QLabel('Epoch:')
         # layout.addWidget(epoch_label)
@@ -246,12 +261,10 @@ class Window(QtWidgets.QWidget):
         else:
             tl = self.time_vectors_weights[self.layer]
 
-        time_vectors = tl[0]
-        for time_vector in tl[1:]:
-            time_vectors = np.vstack([time_vectors, time_vector])
-        pca = PCA(n_components=2).fit_transform(time_vectors)
+        summed_vectors = sum_columns(tl)
+        pca = PCA(n_components=2).fit_transform(summed_vectors)
         if clustered:
-            label = cluster_time_vectors(get_all_time_vectors(tl))
+            label = cluster_time_vectors(summed_vectors, epsilon=self.epsilon)
             ax.scatter(pca[:, 0], pca[:, 1], c=label)
         else:
             ax.scatter(pca[:, 0], pca[:, 1])
