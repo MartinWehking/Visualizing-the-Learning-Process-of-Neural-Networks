@@ -10,12 +10,13 @@ from functools import partial
 import sys
 import numpy as np
 
-from neural_net import ObservableNet, normalize_time_vectors, get_all_time_vectors, cluster_time_vectors, sum_columns
+from neural_net import ObservableNet, cluster_time_vectors, sum_columns, remove_clusters_evaluate
 
 
 class Window(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+        self.observable_net = None
         self.time_vectors_gradients = None
         self.time_vectors_weights = None
         self.weights = None
@@ -45,17 +46,18 @@ class Window(QtWidgets.QWidget):
 
     def initialize_observable_net(self):
         observable_net = ObservableNet(784)
-        #observable_net.add_layer(50, name='hidden')
-        #observable_net.add_layer(10, name='hidden2')
-        observable_net.add_layer(2, name='hidden3')
-        observable_net.add_layer(2, name='hidden4')
+        observable_net.add_layer(512, name='hidden')
+        observable_net.add_layer(256, name='hidden2')
+        observable_net.add_layer(128, name='hidden3')
+        observable_net.add_layer(64, name='hidden4')
         observable_net.add_layer(10, name='output', activation='linear')
         observable_net.train()
+        self.observable_net = observable_net
 
         self.weights = observable_net.weights
         self.gradients = observable_net.gradients
-        self.time_vectors_gradients = [observable_net.create_time_vectors('gradient', layer) for layer in range(3)]
-        self.time_vectors_weights = [observable_net.create_time_vectors('weight', layer) for layer in range(3)]
+        self.time_vectors_gradients = [observable_net.create_time_vectors('gradient', layer) for layer in range(5)]
+        self.time_vectors_weights = [observable_net.create_time_vectors('weight', layer) for layer in range(5)]
         #self.normalized_weights = normalize_time_vectors(self.time_vectors_weights)
         #self.normalized_gradients = normalize_time_vectors(self.time_vectors_gradients)
 
@@ -265,6 +267,7 @@ class Window(QtWidgets.QWidget):
         pca = PCA(n_components=2).fit_transform(summed_vectors)
         if clustered:
             label = cluster_time_vectors(summed_vectors, epsilon=self.epsilon)
+            remove_clusters_evaluate(label, summed_vectors, self.observable_net, self.layer+1)
             ax.scatter(pca[:, 0], pca[:, 1], c=label)
         else:
             ax.scatter(pca[:, 0], pca[:, 1])

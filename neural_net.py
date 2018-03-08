@@ -12,7 +12,14 @@ class ObservableNet:
     def __init__(self, input_units):
         self.previous_input = self.first_input = tf.layers.Input(shape=[input_units])
         self.agg_gradients = None
-        self.mini_batches = 50
+        self.mini_batches = 1000
+        self.y_ = None
+        self.accuracy = None
+        self.test_data = None
+        self.test_labels = None
+        self.sess = None
+        self.restore_layers = list()
+
         self.gradients = pd.DataFrame(columns=['gradient', 'epoch', 'layer'])
         self.weights = pd.DataFrame(columns=['weight', 'epoch', 'layer'])
 
@@ -36,41 +43,56 @@ class ObservableNet:
         correct_prediction = tf.equal(tf.argmax(self.previous_input, axis=1), tf.argmax(y, axis=1))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-        return gradients, apply_operation, y_, accuracy
+        self.y_ = y_
+        self.accuracy = accuracy
+        return gradients, apply_operation, optimizer.variables()
 
-    def train(self, epochs=10, learning_rate=0.1, bad_training=False):
+    def train(self, epochs=5, learning_rate=0.05, bad_training=False):
 
         mnist = tf.contrib.learn.datasets.load_dataset("mnist")
         complete_train_data = mnist.train.images  # Returns np.array
         complete_train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
-        eval_data = mnist.test.images  # Returns np.array
-        eval_labels = np.asarray(mnist.test.labels, dtype=np.int32)
+        self.test_data = mnist.test.images  # Returns np.array
+        self.test_labels = np.asarray(mnist.test.labels, dtype=np.int32)
 
-        gradients, apply_operation, y_, accuracy = self.create_net(learning_rate)
+        gradients, apply_operation, variables = self.create_net(learning_rate)
 
-        with tf.Session() as sess:
-            sess.run(tf.global_variables_initializer())
-            indices = [index for index in range(55000)]
-            for epoch in range(epochs):
-                print('Starting epoch: ' + str(epoch))
-                save_grad_weights = []
-                rd.shuffle(indices)
-                # sess.run([train_image_batch, train_label_batch])
-                for i in range(self.mini_batches):
-                    train_indices = indices[i * 1000: (i + 1) * 1000]
-                    train_data = [complete_train_data[i] for i in train_indices]
-                    if bad_training:
-                        rd.shuffle(train_indices)
+        self.sess = tf.Session()
+        self.sess.run(tf.global_variables_initializer())
+        indices = [index for index in range(55000)]
+        for epoch in range(epochs):
+            print('Starting epoch: ' + str(epoch))
+            save_grad_weights = []
+            rd.shuffle(indices)
+            if bad_training:
+                random_label = [index for index in range(55000)]
+                rd.shuffle(random_label)
+            # sess.run([train_image_batch, train_label_batch])
+            for i in range(self.mini_batches):
+                train_indices = indices[i * 55: (i + 1) * 55]
+                train_data = [complete_train_data[i] for i in train_indices]
+                if not bad_training:
                     train_labels = [complete_train_labels[i] for i in train_indices]
-                    grad_weights, s = sess.run([gradients, apply_operation],
-                                               feed_dict={self.first_input: train_data, y_:
-                                                   train_labels})
-                    save_grad_weights = [grad_weight for i, grad_weight in enumerate(grad_weights) if
-                                         i % 2 == 0]
-                    self.add_gradients(save_grad_weights)
-                print('testing ' + str(accuracy.eval(feed_dict={self.first_input: eval_data, y_: eval_labels})))
-                self.save_weights(save_grad_weights, epoch)
-                self.save_gradients(epoch)
+                else:
+                    train_labels = [complete_train_labels[i] for i in random_label[i * 50: (i + 1) * 50]]
+                grad_weights, s = self.sess.run([gradients, apply_operation],
+                                                feed_dict={self.first_input: train_data, self.y_:
+                                                    train_labels})
+                save_grad_weights = [grad_weight for i, grad_weight in enumerate(grad_weights) if
+                                     i % 2 == 0]
+                self.add_gradients(save_grad_weights)
+            # x = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)[2]
+            # l = x[:, 0].assign(tf.zeros(512))
+            # x = sess.run(l)
+            # print(x)
+            print('training ' + str(
+                self.accuracy.eval(session=self.sess, feed_dict={self.first_input: complete_train_data,
+                                                                 self.y_: complete_train_labels})))
+            print('testing ' + str(
+                self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data, self.y_:
+                    self.test_labels})))
+            self.save_weights(save_grad_weights, epoch)
+            self.save_gradients(epoch)
 
     def save_weights(self, grad_weights, epoch):
         weights = [(grad_weight[1], epoch, layer) for layer, grad_weight in enumerate(grad_weights)]
@@ -84,11 +106,32 @@ class ObservableNet:
             self.agg_gradients = [np.add(self.agg_gradients[i], gradient) for i, gradient in enumerate(gradients)]
 
     def save_gradients(self, epoch):
-        #    ToDo average!
         self.agg_gradients = [(agg_gradient / self.mini_batches, epoch, layer)
                               for layer, agg_gradient in enumerate(self.agg_gradients)]
         self.gradients = self.gradients.append(pd.DataFrame(self.agg_gradients, columns=['gradient', 'epoch', 'layer']))
         self.agg_gradients = None
+
+    def remove_neuron(self, layer, neuron):
+        l = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        neurons = [la for i, la in enumerate(l) if i % 2 == 0][layer]
+        self.sess.run(neurons[neuron, :].assign(tf.zeros(neurons.shape[1])))
+
+    def test(self):
+        return self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data,
+                                                                self.y_: self.test_labels})
+
+    def save_status(self):
+        layers = tf.get_collection_ref(tf.GraphKeys.TRAINABLE_VARIABLES)
+        layers = [x for i, x in enumerate(layers) if i % 2 == 0]
+        for element in layers:
+            self.restore_layers.append(element.eval(session=self.sess))
+
+    def reset(self):
+        train_var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        layers = [la for i, la in enumerate(train_var) if i % 2 == 0]
+        for i, layer in enumerate(layers):
+            self.sess.run(layers[i].assign(self.restore_layers[i]))
+
 
     def create_time_vectors(self, prop, layer):
         if prop == 'gradient':
@@ -137,6 +180,20 @@ def get_all_time_vectors(time_vectors):
 def cluster_time_vectors(time_vectors, epsilon):
     clustered_vectors = DBSCAN(eps=epsilon).fit_predict(time_vectors)
     return clustered_vectors
+
+
+def remove_clusters_evaluate(label, vectors, observable_net, layer):
+    results = list()
+    label_set = set(label)
+    observable_net.save_status()
+    for l in label_set:
+        for i, vector in enumerate(vectors):
+            if label[i] == l:
+                observable_net.remove_neuron(layer, i)
+        eval = observable_net.test()
+        results.append((l, eval))
+        observable_net.reset()
+    return results
 
 
 def sum_columns(time_vectors):
