@@ -10,7 +10,7 @@ from functools import partial
 import sys
 import numpy as np
 
-from neural_net import ObservableNet, cluster_time_vectors, sum_columns, remove_clusters_evaluate
+from neural_net import ObservableNet, cluster_time_vectors, sum_columns
 
 
 class Window(QtWidgets.QWidget):
@@ -267,7 +267,7 @@ class Window(QtWidgets.QWidget):
         pca = PCA(n_components=2).fit_transform(summed_vectors)
         if clustered:
             label = cluster_time_vectors(summed_vectors, epsilon=self.epsilon)
-            remove_clusters_evaluate(label, summed_vectors, self.observable_net, self.layer+1)
+            remove_clusters_evaluate(label, summed_vectors, self.observable_net, self.layer + 1)
             ax.scatter(pca[:, 0], pca[:, 1], c=label)
         else:
             ax.scatter(pca[:, 0], pca[:, 1])

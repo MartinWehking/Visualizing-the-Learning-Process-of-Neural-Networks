@@ -93,6 +93,8 @@ class ObservableNet:
                     self.test_labels})))
             self.save_weights(save_grad_weights, epoch)
             self.save_gradients(epoch)
+        return self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data, self.y_:
+                    self.test_labels})
 
     def save_weights(self, grad_weights, epoch):
         weights = [(grad_weight[1], epoch, layer) for layer, grad_weight in enumerate(grad_weights)]
@@ -180,20 +182,6 @@ def get_all_time_vectors(time_vectors):
 def cluster_time_vectors(time_vectors, epsilon):
     clustered_vectors = DBSCAN(eps=epsilon).fit_predict(time_vectors)
     return clustered_vectors
-
-
-def remove_clusters_evaluate(label, vectors, observable_net, layer):
-    results = list()
-    label_set = set(label)
-    observable_net.save_status()
-    for l in label_set:
-        for i, vector in enumerate(vectors):
-            if label[i] == l:
-                observable_net.remove_neuron(layer, i)
-        eval = observable_net.test()
-        results.append((l, eval))
-        observable_net.reset()
-    return results
 
 
 def sum_columns(time_vectors):
