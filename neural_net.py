@@ -47,7 +47,7 @@ class ObservableNet:
         self.accuracy = accuracy
         return gradients, apply_operation, optimizer.variables()
 
-    def train(self, epochs=5, learning_rate=0.05, bad_training=False):
+    def train(self, epochs=10, learning_rate=0.05, bad_training=False):
 
         mnist = tf.contrib.learn.datasets.load_dataset("mnist")
         complete_train_data = mnist.train.images  # Returns np.array

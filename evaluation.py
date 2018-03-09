@@ -1,6 +1,13 @@
 from neural_net import ObservableNet, sum_columns, cluster_time_vectors
+import pandas as pd
+from os import getcwd
 
-dbscan_params = [1 * 10 ** ((-1) * (i + 1)) for i in range(10)] + [5 * 10 ** ((-1) * (i + 1)) for i in range(10)]
+dbscan_params = [1 * 10 ** ((-1) * (i + 1)) for i in range(10)] + [5 * 10 ** ((-1) * (i + 1)) for i in range(10)] \
+                + [2.5 * 10 ** ((-1) * (i + 1)) for i in range(10)] + [7.5 * 10 ** ((-1) * (i + 1)) for i in range(10)]
+columns = ['removed_label', 'accuracy', 'summed_vectors', 'label', 'epsilon', 'layer', 'g_w']
+path = getcwd() + '/results.csv'
+path_layer = getcwd() + '/grads.csv'
+path_layer2 = getcwd() + '/weights.csv'
 
 
 def remove_clusters_evaluate(label, vectors, observable_net, layer):
@@ -30,11 +37,14 @@ def create_ref_architecture():
 
 
 def start_evaluation():
+    create_dataset()
     net, test_results = create_ref_architecture()
     time_vectors_gradients = [net.create_time_vectors('gradient', layer) for layer in range(5)]
     time_vectors_weights = [net.create_time_vectors('weight', layer) for layer in range(5)]
 
-    print(test_results)
+    save_layer(time_vectors_gradients, test_results)
+    save_layer(time_vectors_weights, test_results, grads=False)
+
 
     for epsilon in dbscan_params:
         for i, layer in enumerate(time_vectors_gradients):
@@ -60,6 +70,25 @@ def start_evaluation():
 
 
 def save_results(removed_label, accuracy, summed_vectors, label, epsilon, layer, g_w):
-    print()
+    new_data = pd.DataFrame([(removed_label, accuracy, summed_vectors, label, epsilon, layer, g_w)], columns=columns)
+    with open(path, 'a') as f:
+        new_data.to_csv(f, header=False, index=False)
+
+
+def save_layer(layers, test, grads=True):
+    tuples = list()
+    for layer in layers:
+        tuples.append((layer, test))
+    to_save = pd.DataFrame(tuples, columns=['layer', 'accuracy'])
+    if grads:
+      to_save.to_csv(path_layer)
+    else:
+        to_save.to_csv(path_layer2)
+
+
+def create_dataset():
+    dataset = pd.DataFrame(columns=columns)
+    dataset.to_csv(path, index=False)
+
 
 start_evaluation()
