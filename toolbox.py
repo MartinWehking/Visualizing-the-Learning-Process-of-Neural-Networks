@@ -2,33 +2,33 @@ from PyQt5 import QtWidgets, QtCore
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 from matplotlib.ticker import MaxNLocator
 from matplotlib import pyplot as plt
 
 import sys
 import numpy as np
 
-from neural_net import ObservableNet, cluster_time_vectors, sum_columns
+from neural_net import ObservableNet, sum_columns
 
 
 class Window(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.observable_net = self.time_vectors_gradients = \
-            self.time_vectors_weights = self.weights = self.gradients = None
+        self.observable_net = self.grad_displays = \
+            self.weight_displays = self.weights = self.gradients = self.displays = None
 
         self.l1_from = self.l1_to = self.l2_from = self.l2_to = None
 
-        self.layer = self.epoch = 0
+        self.layer = 0
+        self.epochs = 2
         self.initialize_observable_net()
         self.vis = 'gradient'
-        self.s_normalized = False
 
         self.figure = Figure()
         self.canvas = FigureCanvasQTAgg(self.figure)
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
         self.init_ui()
+        self.update_texts()
 
     def initialize_observable_net(self):
         observable_net = ObservableNet(784)
@@ -37,13 +37,15 @@ class Window(QtWidgets.QWidget):
         observable_net.add_layer(128, name='hidden3')
         observable_net.add_layer(64, name='hidden4')
         observable_net.add_layer(10, name='output', activation='linear')
-        observable_net.train()
+        observable_net.train(self.epochs)
         self.observable_net = observable_net
 
         self.weights = observable_net.weights
         self.gradients = observable_net.gradients
-        self.time_vectors_gradients = [observable_net.create_time_vectors('gradient', layer) for layer in range(5)]
-        self.time_vectors_weights = [observable_net.create_time_vectors('weight', layer) for layer in range(5)]
+        self.grad_displays = self.create_displays([observable_net.create_time_vectors
+                                                   ('gradient', layer) for layer in range(5)])
+        self.weight_displays = self.create_displays([observable_net.create_time_vectors
+                                                     ('weight', layer) for layer in range(5)])
 
     def init_ui(self):
         self.setMinimumHeight(500)
@@ -76,11 +78,14 @@ class Window(QtWidgets.QWidget):
 
     def change_layer(self, value):
         self.layer = value
+        self.update_texts()
         self.plot()
 
-    def change_epoch(self, value):
-        self.epoch = value
-        self.plot()
+    def update_texts(self):
+        self.l1_from.setText('0')
+        self.l2_from.setText('0')
+        self.l1_to.setText(str(self.grad_displays[self.layer].shape[0]))
+        self.l2_to.setText(str(int(self.grad_displays[self.layer].shape[1] / self.epochs)))
 
     def change_to_grad(self):
         self.vis = 'gradient'
@@ -90,9 +95,22 @@ class Window(QtWidgets.QWidget):
         self.vis = 'weight'
         self.plot()
 
+    def adjust_mm(self):
+        return
+
     def change_to_combined(self):
         self.vis = 'combined'
         self.plot()
+
+    def create_displays(self, time_vectors):
+        displays = list()
+        for layer in range(len(time_vectors)):
+            display = list()
+            for row in time_vectors[layer]:
+                x = row.flatten()
+                display.append(x)
+            displays.append(np.array(display))
+        return displays
 
     def init_settings(self, layout):
         vis_label = QtWidgets.QLabel('Properties:')
@@ -105,7 +123,7 @@ class Window(QtWidgets.QWidget):
 
         first = QtWidgets.QRadioButton('Gradients')
         first.toggle()
-        first.toggled.connect(lambda _: self.change_to_grad)
+        first.toggled.connect(self.change_to_grad)
         h_box.addWidget(first)
 
         second = QtWidgets.QRadioButton('Weights')
@@ -121,7 +139,15 @@ class Window(QtWidgets.QWidget):
         layer_selection = QtWidgets.QComboBox()
         layout.addWidget(layer_selection)
 
-        layer_selection.addItems(self.weights['layer'].apply(str).unique())
+        layer_items = list()
+        for item in self.weights['layer'].unique():
+            if item == 0:
+                layer_items.append('Input - Hidden 1')
+            elif item == len(self.weights['layer'].unique()) - 1:
+                layer_items.append('Hidden ' + str(item - 1) + ' - Output')
+            else:
+                layer_items.append('Hidden ' + str(item - 1) + ' - Hidden ' + str(item))
+        layer_selection.addItems(layer_items)
         layer_selection.currentIndexChanged.connect(self.change_layer)
 
         l1_selection = QtWidgets.QGroupBox()
@@ -143,9 +169,9 @@ class Window(QtWidgets.QWidget):
         l2_selection_box.addWidget(l2_to_selection)
 
         layout.addWidget(QtWidgets.QLabel('Show Neurons:'))
-        layout.addWidget(QtWidgets.QLabel('Neurons of Layer 0:'))
+        layout.addWidget(QtWidgets.QLabel('Neurons of Y-Axis Layer:'))
         layout.addWidget(l1_selection)
-        layout.addWidget(QtWidgets.QLabel('Neurons of Layer 1:'))
+        layout.addWidget(QtWidgets.QLabel('Neurons of X-Axis Layer:'))
         layout.addWidget(l2_selection)
 
         apply_button = QtWidgets.QPushButton('Apply')
@@ -156,41 +182,42 @@ class Window(QtWidgets.QWidget):
         draw_unclustered_vectors.pressed.connect(self.plot_time_vectors)
         layout.addWidget(draw_unclustered_vectors)
 
+        adjust = QtWidgets.QPushButton('Adjust Min/Max')
+        # adjust.pressed.connect()
+
     def change_size(self):
-        self.plot(int(self.l1_from.text()), int(self.l1_to.text()), int(self.l2_from.text()), int(self.l2_to.text()))
+        self.plot(l1_from=int(self.l1_from.text()),
+                  l1_to=int(self.l1_to.text()), l2_from=int(self.l2_from.text()), l2_to=int(self.l2_to.text()))
 
-    def plot(self, l1_from=0, l1_to=None, l2_from=0, l2_to=None):
-        if self.vis == 'gradient':
-            if self.s_normalized:
-                time_vectors = self.normalized_gradients
-            else:
-                time_vectors = self.time_vectors_gradients
-                other_vectors = self.time_vectors_weights
+    def get_display(self, vis, l1_from, l1_to, l2_from, l2_to):
+        if vis == 'gradient':
+            display = self.grad_displays[self.layer]
         else:
-            if self.s_normalized:
-                time_vectors = self.normalized_weights
-            else:
-                time_vectors = self.time_vectors_weights
-                other_vectors = self.time_vectors_gradients
-
+            display = self.weight_displays[self.layer]
+        if l1_from is None:
+            l1_from = 0
+        if l2_from is None:
+            l2_from = 0
         if l1_to is None:
-            l1_to = len(time_vectors[self.layer])
+            l1_to = display.shape[0]
         if l2_to is None:
-            l2_to = len(time_vectors[self.layer][0]) * len(time_vectors[self.layer][0][0])
-        else:
-            l2_to = l2_to * len(time_vectors[self.layer][0][0])
+            l2_to = display.shape[1] / self.epochs
+        if 0 <= l1_to <= display.shape[0] and 0 <= l2_to <= display.shape[1] / self.epochs \
+                and 0 <= l1_from <= display.shape[0] and l1_to >= l1_from \
+                and l2_to >= l2_from and 0 <= l2_to <= display.shape[1] / self.epochs:
+            if l1_from == l1_to:
+                l1_to = l1_to + 1
+            if l2_from == l2_to:
+                l2_to = l2_to + 1
+            display = display[l1_from:l1_to, l2_from:int(l2_to) * self.epochs]
+        return display
+
+    def plot(self, adjust_min=None, adjust_max=None, l1_from=0, l1_to=None, l2_from=0, l2_to=None):
+        display = self.get_display(self.vis, l1_from, l1_to, l2_from, l2_to)
 
         self.figure.clear()
         ax = self.figure.add_subplot(111)
-        ax.clear()
-
-        epochs = len(time_vectors[self.layer][0][0])
-
-        image = self.create_display(time_vectors, l1_from, l1_to, l2_from, l2_to)
-
-        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-        if self.layer == len(time_vectors) - 1:
+        if self.layer == len(self.grad_displays) - 1:
             ax.set_xlabel('Output Layer')
         else:
             ax.set_xlabel('Hidden Layer ' + str(self.layer))
@@ -198,29 +225,25 @@ class Window(QtWidgets.QWidget):
             ax.set_ylabel('Hidden Layer ' + str(self.layer - 1))
         else:
             ax.set_ylabel('Input Layer')
-        ax.grid(b=True, which='major', color='k', axis='x', linestyle='--')
-        # ax.yaxis.set_minor_locator(plt.FormatStrFormatter('%.0f'))
-        # ax.xaxis.set_minor_locator(plt.FormatStrFormatter('%.0f'))
-        display = ax.imshow(image, aspect='auto', cmap='RdGy', interpolation='None',
-                            extent=[0, int(len(image[0]) / epochs), len(image), 0])
+        ax.clear()
+
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+        #ax.grid(b=True, which='major', color='k', axis='x', linestyle='--')
+        display = ax.imshow(display, aspect='auto', cmap='RdGy', interpolation='None',
+                            extent=[0, int(len(display[0]) / self.epochs), len(display), 0], vmin=adjust_min,
+                            vmax=adjust_max)
         cb = self.figure.colorbar(display, shrink=0.5)
         cb.set_label('Values')
-        if self.vis == 'combined':
-            other_display = self.create_display(other_vectors, l1_from, l1_to, l2_from, l2_to)
-            other_display = ax.imshow(other_display, aspect='auto', cmap='PuOr', interpolation='None',
-                                      extent=[0, int(len(image[0]) / epochs), len(image), 0])
+        # if self.vis == 'combined':
+        #    other_display = self.create_display(other_vectors, l1_from, l1_to, l2_from, l2_to)
+        #    other_display = ax.imshow(other_display, aspect='auto', cmap='PuOr', interpolation='None',
+        #                              extent=[0, int(len(image[0]) / self.epochs), len(image), 0], vmin=adjust_min,
+        #                             vmax=adjust_max)
         self.canvas.draw()
 
-    def create_display(self, time_vectors, l1_from, l1_to, l2_from, l2_to):
-        display = list()
-
-        for i, row in enumerate(time_vectors[self.layer]):
-            if l1_from <= i <= l1_to:
-                x = row.flatten()[l2_from:l2_to]
-                display.append(x)
-        return np.array(display)
-
-    def plot_time_vectors(self, clustered=True):
+    def plot_time_vectors(self):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
         ax.clear()
@@ -231,12 +254,8 @@ class Window(QtWidgets.QWidget):
             tl = self.time_vectors_weights[self.layer]
 
         summed_vectors = sum_columns(tl)
-        pca = TSNE(n_components=2, perplexity=10).fit_transform(summed_vectors)
-        if clustered:
-            label = cluster_time_vectors(summed_vectors, epsilon=self.epsilon)
-            ax.scatter(pca[:, 0], pca[:, 1], c=label)
-        else:
-            ax.scatter(pca[:, 0], pca[:, 1])
+        ax.scatter(summed_vectors[:, 0], summed_vectors[:, 1])
+        ax.scatter(summed_vectors[:, 0], summed_vectors[:, 1])
         self.canvas.draw()
 
     def visualize_time_vectors(self, layer):

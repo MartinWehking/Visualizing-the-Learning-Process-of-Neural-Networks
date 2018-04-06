@@ -3,16 +3,17 @@ from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-import random as rd
+from numpy.random import shuffle
 from sklearn.cluster import DBSCAN
-from sklearn.preprocessing import MinMaxScaler
 
 
 class ObservableNet:
-    def __init__(self, input_units):
+    def __init__(self, input_units, seed=3125):
+        self.seed = seed
+        tf.set_random_seed(self.seed)
         self.previous_input = self.first_input = tf.layers.Input(shape=[input_units])
         self.agg_gradients = None
-        self.mini_batches = 1000
+        self.mini_batches = 100
         self.y_ = None
         self.accuracy = None
         self.test_data = None
@@ -51,8 +52,7 @@ class ObservableNet:
         self.accuracy = accuracy
         return gradients, apply_operation, optimizer.variables()
 
-    def train(self, epochs=5, learning_rate=0.05, bad_training=False):
-
+    def train(self, epochs, learning_rate=0.1, bad_training=False):
         mnist = tf.contrib.learn.datasets.load_dataset("mnist")
         complete_train_data = mnist.train.images  # Returns np.array
         complete_train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
@@ -61,19 +61,19 @@ class ObservableNet:
 
         gradients, apply_operation, variables = self.create_net(learning_rate)
 
+        np.random.seed(self.seed)
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
         indices = [index for index in range(55000)]
         for epoch in range(epochs):
             print('Starting epoch: ' + str(epoch))
             save_grad_weights = []
-            rd.shuffle(indices)
+            shuffle(indices)
             if bad_training:
                 random_label = [index for index in range(55000)]
-                rd.shuffle(random_label)
-            # sess.run([train_image_batch, train_label_batch])
+                shuffle(random_label)
             for i in range(self.mini_batches):
-                train_indices = indices[i * 55: (i + 1) * 55]
+                train_indices = indices[i * 550: (i + 1) * 550]
                 train_data = [complete_train_data[i] for i in train_indices]
                 if not bad_training:
                     train_labels = [complete_train_labels[i] for i in train_indices]
