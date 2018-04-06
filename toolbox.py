@@ -20,7 +20,7 @@ class Window(QtWidgets.QWidget):
         self.l1_from = self.l1_to = self.l2_from = self.l2_to = None
 
         self.layer = 0
-        self.epochs = 2
+        self.epochs = 10
         self.initialize_observable_net()
         self.vis = 'gradient'
 
@@ -58,6 +58,9 @@ class Window(QtWidgets.QWidget):
         h_box = QtWidgets.QHBoxLayout()
 
         center = QtWidgets.QGroupBox()
+        #center.setMinimumWidth((int(self.width() / 3)) * 2)
+        #main_group.setMaximumWidth(int(self.width() / 3))
+
         left = QtWidgets.QVBoxLayout()
         left.addWidget(self.toolbar)
         left.addWidget(self.canvas)
@@ -202,6 +205,7 @@ class Window(QtWidgets.QWidget):
             l1_to = display.shape[0]
         if l2_to is None:
             l2_to = display.shape[1] / self.epochs
+        #ToDo l2_from Fix
         if 0 <= l1_to <= display.shape[0] and 0 <= l2_to <= display.shape[1] / self.epochs \
                 and 0 <= l1_from <= display.shape[0] and l1_to >= l1_from \
                 and l2_to >= l2_from and 0 <= l2_to <= display.shape[1] / self.epochs:
@@ -213,7 +217,6 @@ class Window(QtWidgets.QWidget):
         return display
 
     def plot(self, adjust_min=None, adjust_max=None, l1_from=0, l1_to=None, l2_from=0, l2_to=None):
-        display = self.get_display(self.vis, l1_from, l1_to, l2_from, l2_to)
 
         self.figure.clear()
         ax = self.figure.add_subplot(111)
@@ -230,12 +233,30 @@ class Window(QtWidgets.QWidget):
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-        #ax.grid(b=True, which='major', color='k', axis='x', linestyle='--')
-        display = ax.imshow(display, aspect='auto', cmap='RdGy', interpolation='None',
-                            extent=[0, int(len(display[0]) / self.epochs), len(display), 0], vmin=adjust_min,
-                            vmax=adjust_max)
-        cb = self.figure.colorbar(display, shrink=0.5)
-        cb.set_label('Values')
+        # ax.grid(b=True, which='major', color='k', axis='x', linestyle='--')
+        if self.vis is not 'combined':
+            display = self.get_display(self.vis, l1_from, l1_to, l2_from, l2_to)
+            display = ax.imshow(display, aspect='auto', cmap='RdGy', interpolation='None',
+                                extent=[0, int(len(display[0]) / self.epochs), len(display), 0], vmin=adjust_min,
+                                vmax=adjust_max)
+
+            cb = self.figure.colorbar(display, shrink=0.5)
+            cb.set_label(self.vis)
+        else:
+            display_1 = self.get_display('gradient', l1_from, l1_to, l2_from, l2_to)
+            display_2 = self.get_display('weight', l1_from, l1_to, l2_from, l2_to)
+
+            display_1 = ax.imshow(display_1, aspect='auto', cmap='RdGy', interpolation='None',
+                                  extent=[0, int(len(display_1[0]) / self.epochs), len(display_1), 0], vmin=adjust_min,
+                                  vmax=adjust_max)
+            cb = self.figure.colorbar(display_1, shrink=0.5)
+            cb.set_label('gradient')
+            display_2 = ax.imshow(display_2, aspect='auto', cmap='PuOr', interpolation='None',
+                                  extent=[0, int(len(display_2[0]) / self.epochs), len(display_2), 0], vmin=adjust_min,
+                                  vmax=adjust_max)
+            cb_2 = self.figure.colorbar(display_2, shrink=0.5)
+            cb_2.set_label('weight')
+
         # if self.vis == 'combined':
         #    other_display = self.create_display(other_vectors, l1_from, l1_to, l2_from, l2_to)
         #    other_display = ax.imshow(other_display, aspect='auto', cmap='PuOr', interpolation='None',
