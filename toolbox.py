@@ -2,10 +2,9 @@ from PyQt5 import QtWidgets, QtCore
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 from matplotlib.ticker import MaxNLocator
 from matplotlib import pyplot as plt
-from networkx import Graph, draw_networkx, get_node_attributes
-from functools import partial
 
 import sys
 import numpy as np
@@ -16,28 +15,15 @@ from neural_net import ObservableNet, cluster_time_vectors, sum_columns
 class Window(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.observable_net = None
-        self.time_vectors_gradients = None
-        self.time_vectors_weights = None
-        self.weights = None
-        self.gradients = None
+        self.observable_net = self.time_vectors_gradients = \
+            self.time_vectors_weights = self.weights = self.gradients = None
 
-        self.normalized_weights = None
-        self.normalized_gradients = None
-
-        self.l1_from = None
-        self.l1_to = None
-        self.l2_from = None
-        self.l2_to = None
+        self.l1_from = self.l1_to = self.l2_from = self.l2_to = None
 
         self.layer = self.epoch = 0
-        self.epsilon = 0.01
         self.initialize_observable_net()
         self.vis = 'gradient'
         self.s_normalized = False
-
-        #self.normalized_weights = normalize_time_vectors(self.time_vectors_weights)
-        #self.normalized_gradients = normalize_time_vectors(self.time_vectors_gradients)
 
         self.figure = Figure()
         self.canvas = FigureCanvasQTAgg(self.figure)
@@ -58,12 +44,10 @@ class Window(QtWidgets.QWidget):
         self.gradients = observable_net.gradients
         self.time_vectors_gradients = [observable_net.create_time_vectors('gradient', layer) for layer in range(5)]
         self.time_vectors_weights = [observable_net.create_time_vectors('weight', layer) for layer in range(5)]
-        #self.normalized_weights = normalize_time_vectors(self.time_vectors_weights)
-        #self.normalized_gradients = normalize_time_vectors(self.time_vectors_gradients)
 
     def init_ui(self):
-        self.setMinimumHeight(400)
-        self.setMinimumWidth(800)
+        self.setMinimumHeight(500)
+        self.setMinimumWidth(1000)
 
         main_group = QtWidgets.QGroupBox('Visualization Settings')
         setting_layout = QtWidgets.QVBoxLayout()
@@ -87,17 +71,12 @@ class Window(QtWidgets.QWidget):
         self.show()
 
     def init_bottom(self, layout):
-        show_net = QtWidgets.QPushButton('Show Neural Network')
+        show_net = QtWidgets.QPushButton('Neural Network Settings')
         layout.addWidget(show_net)
 
     def change_layer(self, value):
         self.layer = value
         self.plot()
-
-    def change_epsilon(self, value):
-        print('hi')
-        self.epsilon = value
-        self.plot_time_vectors()
 
     def change_epoch(self, value):
         self.epoch = value
@@ -111,6 +90,10 @@ class Window(QtWidgets.QWidget):
         self.vis = 'weight'
         self.plot()
 
+    def change_to_combined(self):
+        self.vis = 'combined'
+        self.plot()
+
     def init_settings(self, layout):
         vis_label = QtWidgets.QLabel('Properties:')
         layout.addWidget(vis_label)
@@ -122,12 +105,16 @@ class Window(QtWidgets.QWidget):
 
         first = QtWidgets.QRadioButton('Gradients')
         first.toggle()
-        first.toggled.connect(self.change_to_grad)
+        first.toggled.connect(lambda _: self.change_to_grad)
         h_box.addWidget(first)
 
         second = QtWidgets.QRadioButton('Weights')
         second.toggled.connect(self.change_to_weight)
         h_box.addWidget(second)
+
+        third = QtWidgets.QRadioButton('Combination')
+        third.toggled.connect(self.change_to_combined)
+        h_box.addWidget(third)
 
         layer_label = QtWidgets.QLabel('Layer:')
         layout.addWidget(layer_label)
@@ -169,48 +156,6 @@ class Window(QtWidgets.QWidget):
         draw_unclustered_vectors.pressed.connect(self.plot_time_vectors)
         layout.addWidget(draw_unclustered_vectors)
 
-        layout.addWidget(QtWidgets.QLabel('Clustering Epsilon:'))
-        epsilon = QtWidgets.QLineEdit('0.01')
-        epsilon.returnPressed.connect(partial(self.change_epsilon, float(epsilon.text())))
-        layout.addWidget(epsilon)
-
-
-        #normalize_button = QtWidgets.QPushButton('Show normalized Time-Vectors')
-        #normalize_button.pressed.connect(self.show_normalized)
-        #layout.addWidget(normalize_button)
-
-        # epoch_label = QtWidgets.QLabel('Epoch:')
-        # layout.addWidget(epoch_label)
-        # epoch_selection = QtWidgets.QComboBox()
-        # layout.addWidget(epoch_selection)
-
-        # epoch_selection.addItems(self.weights['epoch'].apply(str).unique())
-        # epoch_selection.currentIndexChanged.connect(self.change_epoch)
-
-        from_to1 = QtWidgets.QLabel
-
-    def show_normalized(self):
-        if self.s_normalized:
-            self.s_normalized = False
-        else:
-            self.s_normalized = True
-        self.plot()
-
-    def plot_heatmap(self):
-        ax = self.figure.add_subplot(111)
-        ax.clear()
-        self.figure.subplots_adjust(left=0, right=1, bottom=0, top=1)
-
-        if self.vis == 'gradient':
-            series = self.gradients.loc[
-                (self.gradients['epoch'] == self.epoch) & (self.gradients['layer'] == self.layer)]
-        else:
-            series = self.weights.loc[
-                (self.weights['epoch'] == self.epoch) & (self.weights['layer'] == self.layer)]
-        values = series[self.vis].tolist()
-        ax.imshow(values[0], interpolation='nearest', aspect='auto')
-        self.canvas.draw()
-
     def change_size(self):
         self.plot(int(self.l1_from.text()), int(self.l1_to.text()), int(self.l2_from.text()), int(self.l2_to.text()))
 
@@ -220,11 +165,13 @@ class Window(QtWidgets.QWidget):
                 time_vectors = self.normalized_gradients
             else:
                 time_vectors = self.time_vectors_gradients
+                other_vectors = self.time_vectors_weights
         else:
             if self.s_normalized:
                 time_vectors = self.normalized_weights
             else:
                 time_vectors = self.time_vectors_weights
+                other_vectors = self.time_vectors_gradients
 
         if l1_to is None:
             l1_to = len(time_vectors[self.layer])
@@ -236,22 +183,42 @@ class Window(QtWidgets.QWidget):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
         ax.clear()
-        a = list()
+
         epochs = len(time_vectors[self.layer][0][0])
+
+        image = self.create_display(time_vectors, l1_from, l1_to, l2_from, l2_to)
+
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        if self.layer == len(time_vectors) - 1:
+            ax.set_xlabel('Output Layer')
+        else:
+            ax.set_xlabel('Hidden Layer ' + str(self.layer))
+        if self.layer > 0:
+            ax.set_ylabel('Hidden Layer ' + str(self.layer - 1))
+        else:
+            ax.set_ylabel('Input Layer')
+        ax.grid(b=True, which='major', color='k', axis='x', linestyle='--')
+        # ax.yaxis.set_minor_locator(plt.FormatStrFormatter('%.0f'))
+        # ax.xaxis.set_minor_locator(plt.FormatStrFormatter('%.0f'))
+        display = ax.imshow(image, aspect='auto', cmap='RdGy', interpolation='None',
+                            extent=[0, int(len(image[0]) / epochs), len(image), 0])
+        cb = self.figure.colorbar(display, shrink=0.5)
+        cb.set_label('Values')
+        if self.vis == 'combined':
+            other_display = self.create_display(other_vectors, l1_from, l1_to, l2_from, l2_to)
+            other_display = ax.imshow(other_display, aspect='auto', cmap='PuOr', interpolation='None',
+                                      extent=[0, int(len(image[0]) / epochs), len(image), 0])
+        self.canvas.draw()
+
+    def create_display(self, time_vectors, l1_from, l1_to, l2_from, l2_to):
+        display = list()
+
         for i, row in enumerate(time_vectors[self.layer]):
             if l1_from <= i <= l1_to:
                 x = row.flatten()[l2_from:l2_to]
-                a.append(x)
-        a = np.array(a)
-        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-        ax.set_xlabel('Layer ' + str(self.layer))
-        ax.set_ylabel('Layer ' + str(self.layer - 1))
-        ax.grid(b=True, which='major', color='k', axis='x', linestyle='--')
-        ax.yaxis.set_minor_locator(plt.MultipleLocator(1))
-        ax.xaxis.set_major_formatter(plt.FormatStrFormatter('%.0f'))
-        ax.imshow(a, aspect='auto', cmap='RdGy', interpolation='None', extent=[0, int(len(a[0]) / epochs), len(a), 0])
-        self.canvas.draw()
+                display.append(x)
+        return np.array(display)
 
     def plot_time_vectors(self, clustered=True):
         self.figure.clear()
@@ -264,10 +231,9 @@ class Window(QtWidgets.QWidget):
             tl = self.time_vectors_weights[self.layer]
 
         summed_vectors = sum_columns(tl)
-        pca = PCA(n_components=2).fit_transform(summed_vectors)
+        pca = TSNE(n_components=2, perplexity=10).fit_transform(summed_vectors)
         if clustered:
             label = cluster_time_vectors(summed_vectors, epsilon=self.epsilon)
-            remove_clusters_evaluate(label, summed_vectors, self.observable_net, self.layer + 1)
             ax.scatter(pca[:, 0], pca[:, 1], c=label)
         else:
             ax.scatter(pca[:, 0], pca[:, 1])
@@ -280,33 +246,6 @@ class Window(QtWidgets.QWidget):
                 vectors.append(vector)
         representations = PCA().fit_transform(vectors)
         plt.scatter(representations[:, 0], representations[:, 1])
-
-
-def visualize_embeddings_networkx(embeddings, step=None):
-    if step is None:
-        step = max(embeddings['step'].tolist())
-    vis_embeddings = embeddings[str(step)]
-    pca_embeddings = PCA(n_components=2).fit_transform(vis_embeddings.tolist())
-    embedding_graph = Graph()
-    color_map = []
-    for index, embedding in enumerate(pca_embeddings):
-        node_number = embeddings['node'].tolist()[index]
-        embedding_graph.add_node(node_number, pos=embedding)
-        node_step = embeddings['step'].tolist()[index]
-        color_map.append(int(10 * node_step))
-    # edge_colors = []
-    # if original_graph is not None:
-    #    for edge in original_graph.edges():
-    #       embedding_graph.add_edge(edge[0], edge[1])
-    #       if mark_step:
-    #           if str(edge[0]) in frequent_nodes or str(edge[1]) in frequent_nodes:
-    #               edge_colors.append(0.1)
-    #           else:
-    #             edge_colors.append(0.2)
-    #
-    draw_networkx(embedding_graph, pos=get_node_attributes(embedding_graph, 'pos'),
-                  node_color=color_map, font_color='r')
-    plt.show()
 
 
 if __name__ == "__main__":

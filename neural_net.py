@@ -27,8 +27,12 @@ class ObservableNet:
         if type == 'dense':
             if activation == 'relu':
                 self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.relu, name=name)
-            else:
+            elif activation == 'linear':
                 self.previous_input = tf.layers.dense(self.previous_input, units, name=name)
+            elif activation == 'sigmoid':
+                self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.sigmoid, name=name)
+            else:
+                raise AttributeError('Activation has to be relu, linear or sigmoid.')
 
     def create_net(self, learning_rate):
         y_ = tf.placeholder(tf.int32)
@@ -47,7 +51,7 @@ class ObservableNet:
         self.accuracy = accuracy
         return gradients, apply_operation, optimizer.variables()
 
-    def train(self, epochs=10, learning_rate=0.05, bad_training=False):
+    def train(self, epochs=5, learning_rate=0.05, bad_training=False):
 
         mnist = tf.contrib.learn.datasets.load_dataset("mnist")
         complete_train_data = mnist.train.images  # Returns np.array
@@ -81,10 +85,6 @@ class ObservableNet:
                 save_grad_weights = [grad_weight for i, grad_weight in enumerate(grad_weights) if
                                      i % 2 == 0]
                 self.add_gradients(save_grad_weights)
-            # x = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)[2]
-            # l = x[:, 0].assign(tf.zeros(512))
-            # x = sess.run(l)
-            # print(x)
             print('training ' + str(
                 self.accuracy.eval(session=self.sess, feed_dict={self.first_input: complete_train_data,
                                                                  self.y_: complete_train_labels})))
@@ -151,24 +151,6 @@ class ObservableNet:
             time_vector_rows = np.array(time_vector_rows)
             time_vectors.append(time_vector_rows)
         return time_vectors
-
-
-def normalize_time_vectors(time_vectors):
-    normalized_time_vectors = list()
-    for layer in time_vectors:
-        normalized_layer = list()
-        for row in layer:
-            # normalized_row = np.apply_along_axis(lambda x: MinMaxScaler().fit_transform(np.asmatrix(x)), 0, row)
-            row = np.asmatrix(row)
-            # normalized_row = (row - np.min(row, axis=1)) / (np.max(row, axis=1) - np.min(row, axis=1))
-            normalized_row = list()
-            for time_vector in row:
-                scaler = MinMaxScaler()
-                scaler.fit(time_vector)
-                normalized_row.append(scaler.transform(time_vector))
-            normalized_layer.append(np.array(normalized_row))
-        normalized_time_vectors.append(normalized_layer)
-    return normalized_time_vectors
 
 
 def get_all_time_vectors(time_vectors):
