@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-import keras
 from numpy.random import shuffle
+np.random.seed(15)
 from keras.datasets import mnist
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import MinMaxScaler
