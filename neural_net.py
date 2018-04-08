@@ -40,7 +40,7 @@ class ObservableNet:
                 raise AttributeError('Activation has to be relu, linear or sigmoid.')
 
     def create_net(self, learning_rate):
-        y = tf.placeholder(tf.float64)
+        y = tf.placeholder(tf.int32)
 
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.previous_input,
                                                                          labels=y))
@@ -49,13 +49,13 @@ class ObservableNet:
         apply_operation = optimizer.apply_gradients(gradients)
 
         correct_prediction = tf.equal(tf.argmax(self.previous_input, axis=1), tf.argmax(y, axis=1))
-        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float64))
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
         self.y_ = y
         self.accuracy = accuracy
         return gradients, apply_operation, optimizer.variables()
 
-    def train(self, epochs, learning_rate=0.2, bad_training=False):
+    def train(self, epochs, learning_rate=0.09, bad_training=False):
         (complete_train_data, complete_train_labels), (self.test_data, self.test_labels) = mnist.load_data()
         complete_train_data = np.reshape(complete_train_data, [complete_train_data.shape[0], 784])
         self.test_data = np.reshape(self.test_data, [self.test_data.shape[0], 784])
@@ -69,12 +69,11 @@ class ObservableNet:
         np.random.seed(self.seed)
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
-        self.test_labels = self.sess.run(tf.one_hot(self.test_labels, depth=10, dtype=tf.float64))
-        complete_train_labels = self.sess.run(tf.one_hot(complete_train_labels, depth=10, dtype=tf.float64))
+        self.test_labels = self.sess.run(tf.one_hot(self.test_labels, depth=10, dtype=tf.int32))
+        complete_train_labels = self.sess.run(tf.one_hot(complete_train_labels, depth=10, dtype=tf.int32))
         indices = [index for index in range(60000)]
         for epoch in range(epochs):
             print('Starting epoch: ' + str(epoch))
-            save_grad_weights = []
             shuffle(indices)
             if bad_training:
                 random_label = [index for index in range(60000)]
@@ -89,16 +88,14 @@ class ObservableNet:
                 grad_weights, s = self.sess.run([gradients, apply_operation],
                                                 feed_dict={self.first_input: train_data, self.y_:
                                                     train_labels})
-                save_grad_weights = [grad_weight for i, grad_weight in enumerate(grad_weights) if
-                                     i % 2 == 0]
-                self.add_gradients(save_grad_weights)
+                self.add_gradients(grad_weights)
             print('training ' + str(
                 self.accuracy.eval(session=self.sess, feed_dict={self.first_input: complete_train_data,
                                                                  self.y_: complete_train_labels})))
             print('testing ' + str(
                 self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data, self.y_:
                     self.test_labels})))
-            self.save_weights(save_grad_weights, epoch)
+            self.save_weights(grad_weights, epoch)
             self.save_gradients(epoch)
         return self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data, self.y_:
             self.test_labels})
@@ -121,9 +118,8 @@ class ObservableNet:
         self.agg_gradients = None
 
     def remove_neuron(self, layer, neuron):
-        l = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-        neurons = [la for i, la in enumerate(l) if i % 2 == 0][layer]
-        self.sess.run(neurons[neuron, :].assign(tf.zeros(neurons.shape[1])))
+        weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)[layer]
+        self.sess.run(weights[neuron, :].assign(tf.zeros(weights.shape[1], dtype=tf.float64)))
 
     def test(self):
         return self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data,
@@ -131,13 +127,11 @@ class ObservableNet:
 
     def save_status(self):
         layers = tf.get_collection_ref(tf.GraphKeys.TRAINABLE_VARIABLES)
-        layers = [x for i, x in enumerate(layers) if i % 2 == 0]
         for element in layers:
             self.restore_layers.append(element.eval(session=self.sess))
 
     def reset(self):
-        train_var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-        layers = [la for i, la in enumerate(train_var) if i % 2 == 0]
+        layers = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         for i, layer in enumerate(layers):
             self.sess.run(layers[i].assign(self.restore_layers[i]))
 

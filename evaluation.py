@@ -18,7 +18,7 @@ def remove_clusters_evaluate(label, vectors, observable_net, layer):
     for l in label_set:
         for i, vector in enumerate(vectors):
             if label[i] == l:
-                observable_net.remove_neuron(layer, i)
+                observable_net.remove_neuron(layer + 1, i)
         eval = observable_net.test()
         results.append((l, eval))
         observable_net.reset()
@@ -32,7 +32,7 @@ def create_ref_architecture():
     observable_net.add_layer(128, name='hidden3', seed=7675)
     observable_net.add_layer(64, name='hidden4', seed=8345)
     observable_net.add_layer(10, name='output', activation='linear', seed=997)
-    test_results = observable_net.train(25)
+    test_results = observable_net.train(2)
 
     return observable_net, test_results
 
@@ -52,7 +52,7 @@ def create_time_vectors():
 def start_dbscan_evaluation():
     net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
     for epsilon in dbscan_params:
-        for i, layer in enumerate(time_vectors_gradients):
+        for i, layer in enumerate(time_vectors_gradients[:-1]):
             summed_vectors = sum_columns(layer)
             label = DBSCAN(eps=epsilon).fit_predict(summed_vectors)
             results = remove_clusters_evaluate(label, summed_vectors, net, i)
@@ -63,7 +63,7 @@ def start_dbscan_evaluation():
                     save_results(result[0], result[1], summed_vectors, label, epsilon, i, 'g')
 
     for epsilon in dbscan_params:
-        for i, layer in enumerate(time_vectors_weights):
+        for i, layer in enumerate(time_vectors_weights[:-1]):
             summed_vectors = sum_columns(layer)
             label = DBSCAN(eps=epsilon).fit_predict(summed_vectors)
             if len(set(label)) == 1:
@@ -78,7 +78,7 @@ def start_kmeans_evaluation():
     net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
     for i in range(70):
         i = i + 1
-        for x, layer in enumerate(time_vectors_gradients):
+        for x, layer in enumerate(time_vectors_gradients[:-1]):
             summed_vectors = sum_columns(layer)
             label = KMeans(n_clusters=i, random_state=3125).fit_predict(summed_vectors)
             results = remove_clusters_evaluate(label, summed_vectors, net, x)
@@ -90,7 +90,7 @@ def start_kmeans_evaluation():
 
     for i in range(70):
         i = i + 1
-        for x, layer in enumerate(time_vectors_weights):
+        for x, layer in enumerate(time_vectors_weights[:-1]):
             summed_vectors = sum_columns(layer)
             label = KMeans(n_clusters=i, random_state=3125).fit_predict(summed_vectors)
             results = remove_clusters_evaluate(label, summed_vectors, net, x)
@@ -105,19 +105,19 @@ def start_hac_evaluation():
     net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
     for i in range(70):
         i = i + 1
-        for x, layer in enumerate(time_vectors_gradients):
-            summed_vectors = sum_columns(layer)
-            label = AgglomerativeClustering(n_clusters=i).fit_predict(summed_vectors)
-            results = remove_clusters_evaluate(label, summed_vectors, net, x)
-            if len(results) == 1:
+        for x, layer in enumerate(time_vectors_gradients[:-1]):
+              summed_vectors = sum_columns(layer)
+              label = AgglomerativeClustering(n_clusters=i).fit_predict(summed_vectors)
+              results = remove_clusters_evaluate(label, summed_vectors, net, x)
+              if len(results) == 1:
                 save_results(results[0][0], 0, summed_vectors, label, i, x, 'g')
-            else:
+              else:
                 for result in results:
                     save_results(result[0], result[1], summed_vectors, label, i, x, 'g')
 
     for i in range(70):
         i = i + 1
-        for x, layer in enumerate(time_vectors_weights):
+        for x, layer in enumerate(time_vectors_weights[:-1]):
             summed_vectors = sum_columns(layer)
             label = AgglomerativeClustering(n_clusters=i).fit_predict(summed_vectors)
             results = remove_clusters_evaluate(label, summed_vectors, net, x)

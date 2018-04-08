@@ -20,7 +20,7 @@ class Window(QtWidgets.QWidget):
         self.l1_from = self.l1_to = self.l2_from = self.l2_to = None
 
         self.layer = 0
-        self.epochs = 50
+        self.epochs = 5
         self.initialize_observable_net()
         self.vis = 'gradient'
 
@@ -213,7 +213,7 @@ class Window(QtWidgets.QWidget):
                 l1_to = l1_to + 1
             if l2_from == l2_to:
                 l2_to = l2_to + 1
-            display = display[l1_from:l1_to, l2_from:int(l2_to) * self.epochs]
+            display = display[l1_from:l1_to, l2_from *self.epochs:int(l2_to) * self.epochs]
         return display
 
     def plot(self, adjust_min=None, adjust_max=None, l1_from=0, l1_to=None, l2_from=0, l2_to=None):
