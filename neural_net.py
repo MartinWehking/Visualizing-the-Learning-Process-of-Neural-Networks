@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import keras
 from numpy.random import shuffle
 from keras.datasets import mnist
 from sklearn.cluster import DBSCAN
@@ -24,14 +25,15 @@ class ObservableNet:
         self.gradients = pd.DataFrame(columns=['gradient', 'epoch', 'layer'])
         self.weights = pd.DataFrame(columns=['weight', 'epoch', 'layer'])
 
-    def add_layer(self, units, name, type='dense', activation='relu'):
+    def add_layer(self, units, name, type='dense', activation='relu', seed=12222):
         if type == 'dense':
             if activation == 'relu':
-                self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.relu, name=name)
+                self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.relu, name=name, use_bias=False)
             elif activation == 'linear':
-                self.previous_input = tf.layers.dense(self.previous_input, units, name=name)
+                self.previous_input = tf.layers.dense(self.previous_input, units, name=name, use_bias=False)
             elif activation == 'sigmoid':
-                self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.sigmoid, name=name)
+                self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.sigmoid,
+                                                      name=name, use_bias=False)
             else:
                 raise AttributeError('Activation has to be relu, linear or sigmoid.')
 
@@ -96,7 +98,7 @@ class ObservableNet:
             self.save_weights(save_grad_weights, epoch)
             self.save_gradients(epoch)
         return self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data, self.y_:
-                    self.test_labels})
+            self.test_labels})
 
     def save_weights(self, grad_weights, epoch):
         weights = [(grad_weight[1], epoch, layer) for layer, grad_weight in enumerate(grad_weights)]
@@ -135,7 +137,6 @@ class ObservableNet:
         layers = [la for i, la in enumerate(train_var) if i % 2 == 0]
         for i, layer in enumerate(layers):
             self.sess.run(layers[i].assign(self.restore_layers[i]))
-
 
     def create_time_vectors(self, prop, layer):
         if prop == 'gradient':

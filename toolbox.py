@@ -32,10 +32,10 @@ class Window(QtWidgets.QWidget):
 
     def initialize_observable_net(self):
         observable_net = ObservableNet(784)
-        observable_net.add_layer(512, name='hidden')
-        observable_net.add_layer(256, name='hidden2')
-        observable_net.add_layer(128, name='hidden3')
-        observable_net.add_layer(64, name='hidden4')
+        observable_net.add_layer(512, name='hidden', seed=5)
+        observable_net.add_layer(256, name='hidden2', seed=6)
+        observable_net.add_layer(128, name='hidden3', seed=7)
+        observable_net.add_layer(64, name='hidden4', seed=8)
         observable_net.add_layer(10, name='output', activation='linear')
         observable_net.train(self.epochs)
         self.observable_net = observable_net
