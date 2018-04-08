@@ -28,12 +28,15 @@ class ObservableNet:
     def add_layer(self, units, name, type='dense', activation='relu', seed=12222):
         if type == 'dense':
             if activation == 'relu':
-                self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.relu, name=name, use_bias=False)
+                self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.relu, name=name, use_bias=False,
+                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed))
             elif activation == 'linear':
-                self.previous_input = tf.layers.dense(self.previous_input, units, name=name, use_bias=False)
+                self.previous_input = tf.layers.dense(self.previous_input, units, name=name, use_bias=False,
+                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed))
             elif activation == 'sigmoid':
                 self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.sigmoid,
-                                                      name=name, use_bias=False)
+                                                      name=name, use_bias=False,
+                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed))
             else:
                 raise AttributeError('Activation has to be relu, linear or sigmoid.')
 
