@@ -156,5 +156,5 @@ def load_results(path):
 
 
 if __name__ == "__main__":
-    start_hac_evaluation()
+    start_kmeans_evaluation()
     #load_results(getcwd()+'/results.csv')
