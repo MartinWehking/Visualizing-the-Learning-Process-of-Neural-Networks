@@ -32,7 +32,7 @@ def create_ref_architecture():
     observable_net.add_layer(128, name='hidden3', seed=7675)
     observable_net.add_layer(64, name='hidden4', seed=8345)
     observable_net.add_layer(10, name='output', activation='linear', seed=997)
-    test_results = observable_net.train(2)
+    test_results = observable_net.train(12)
 
     return observable_net, test_results
 

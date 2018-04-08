@@ -55,7 +55,7 @@ class ObservableNet:
         self.accuracy = accuracy
         return gradients, apply_operation, optimizer.variables()
 
-    def train(self, epochs, learning_rate=0.09, bad_training=False):
+    def train(self, epochs, learning_rate=0.25, bad_training=False):
         (complete_train_data, complete_train_labels), (self.test_data, self.test_labels) = mnist.load_data()
         complete_train_data = np.reshape(complete_train_data, [complete_train_data.shape[0], 784])
         self.test_data = np.reshape(self.test_data, [self.test_data.shape[0], 784])
