@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from numpy.random import shuffle
-np.random.seed(15)
 from keras.datasets import mnist
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import MinMaxScaler
@@ -70,6 +69,7 @@ class ObservableNet:
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
         self.test_labels = self.sess.run(tf.one_hot(self.test_labels, depth=10, dtype=tf.int32))
+        print(complete_train_labels[:5])
         complete_train_labels = self.sess.run(tf.one_hot(complete_train_labels, depth=10, dtype=tf.int32))
         indices = [index for index in range(60000)]
         for epoch in range(epochs):
