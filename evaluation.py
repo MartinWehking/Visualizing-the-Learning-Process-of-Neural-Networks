@@ -1,4 +1,4 @@
-from neural_net import ObservableNet, sum_columns, cluster_time_vectors
+from neural_net import ObservableNet, sum_columns
 from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
 import pandas as pd
 from os import getcwd
@@ -32,7 +32,7 @@ def create_ref_architecture():
     observable_net.add_layer(128, name='hidden3')
     observable_net.add_layer(64, name='hidden4')
     observable_net.add_layer(10, name='output', activation='linear')
-    test_results = observable_net.train(12)
+    test_results = observable_net.train(25)
 
     return observable_net, test_results
 

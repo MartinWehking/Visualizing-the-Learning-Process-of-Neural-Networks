@@ -1,5 +1,3 @@
-from tensorflow.examples.tutorials.mnist import input_data
-
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -13,7 +11,7 @@ class ObservableNet:
     def __init__(self, input_units, seed=3125):
         self.seed = seed
         tf.set_random_seed(self.seed)
-        self.previous_input = self.first_input = tf.layers.Input(shape=[input_units])
+        self.previous_input = self.first_input = tf.keras.Input(shape=[input_units])
         self.agg_gradients = None
         self.mini_batches = 100
         self.y_ = None
