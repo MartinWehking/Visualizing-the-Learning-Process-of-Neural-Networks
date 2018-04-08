@@ -20,7 +20,7 @@ class Window(QtWidgets.QWidget):
         self.l1_from = self.l1_to = self.l2_from = self.l2_to = None
 
         self.layer = 0
-        self.epochs = 10
+        self.epochs = 12
         self.initialize_observable_net()
         self.vis = 'gradient'
 

@@ -4,7 +4,9 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from numpy.random import shuffle
+from keras.datasets import mnist
 from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import MinMaxScaler
 
 
 class ObservableNet:
@@ -36,8 +38,7 @@ class ObservableNet:
                 raise AttributeError('Activation has to be relu, linear or sigmoid.')
 
     def create_net(self, learning_rate):
-        y_ = tf.placeholder(tf.int32)
-        y = tf.one_hot(y_, depth=10)
+        y = tf.placeholder(tf.int32)
 
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.previous_input,
                                                                          labels=y))
@@ -48,32 +49,35 @@ class ObservableNet:
         correct_prediction = tf.equal(tf.argmax(self.previous_input, axis=1), tf.argmax(y, axis=1))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-        self.y_ = y_
+        self.y_ = y
         self.accuracy = accuracy
         return gradients, apply_operation, optimizer.variables()
 
-    def train(self, epochs, learning_rate=0.1, bad_training=False):
-        mnist = tf.contrib.learn.datasets.load_dataset("mnist")
-        complete_train_data = mnist.train.images  # Returns np.array
-        complete_train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
-        self.test_data = mnist.test.images  # Returns np.array
-        self.test_labels = np.asarray(mnist.test.labels, dtype=np.int32)
+    def train(self, epochs, learning_rate=0.5, bad_training=False):
+        (complete_train_data, complete_train_labels), (self.test_data, self.test_labels) = mnist.load_data()
+        complete_train_data = np.reshape(complete_train_data, [complete_train_data.shape[0], 784])
+        self.test_data = np.reshape(self.test_data, [self.test_data.shape[0], 784])
+        norm = MinMaxScaler().fit_transform(np.concatenate((complete_train_data, self.test_data), axis=0))
+        complete_train_data = norm[:60000]
+        self.test_data = norm[60000:]
 
         gradients, apply_operation, variables = self.create_net(learning_rate)
 
         np.random.seed(self.seed)
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
-        indices = [index for index in range(55000)]
+        self.test_labels = self.sess.run(tf.one_hot(self.test_labels, depth=10, dtype=tf.int32))
+        complete_train_labels = self.sess.run(tf.one_hot(complete_train_labels, depth=10, dtype=tf.int32))
+        indices = [index for index in range(60000)]
         for epoch in range(epochs):
             print('Starting epoch: ' + str(epoch))
             save_grad_weights = []
             shuffle(indices)
             if bad_training:
-                random_label = [index for index in range(55000)]
+                random_label = [index for index in range(60000)]
                 shuffle(random_label)
             for i in range(self.mini_batches):
-                train_indices = indices[i * 550: (i + 1) * 550]
+                train_indices = indices[i * 600: (i + 1) * 600]
                 train_data = [complete_train_data[i] for i in train_indices]
                 if not bad_training:
                     train_labels = [complete_train_labels[i] for i in train_indices]
