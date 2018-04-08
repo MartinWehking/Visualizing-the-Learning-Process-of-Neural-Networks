@@ -11,7 +11,7 @@ class ObservableNet:
     def __init__(self, input_units, seed=3125):
         self.seed = seed
         tf.set_random_seed(self.seed)
-        self.previous_input = self.first_input = tf.keras.Input(shape=[input_units])
+        self.previous_input = self.first_input = tf.keras.Input(shape=[input_units], dtype=tf.float64)
         self.agg_gradients = None
         self.mini_batches = 100
         self.y_ = None
@@ -28,19 +28,19 @@ class ObservableNet:
         if type == 'dense':
             if activation == 'relu':
                 self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.relu, name=name, use_bias=False,
-                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed))
+                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed, dtype=tf.float64))
             elif activation == 'linear':
                 self.previous_input = tf.layers.dense(self.previous_input, units, name=name, use_bias=False,
-                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed))
+                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed, dtype=tf.float64))
             elif activation == 'sigmoid':
                 self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.sigmoid,
                                                       name=name, use_bias=False,
-                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed))
+                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed, dtype=tf.float64))
             else:
                 raise AttributeError('Activation has to be relu, linear or sigmoid.')
 
     def create_net(self, learning_rate):
-        y = tf.placeholder(tf.int32)
+        y = tf.placeholder(tf.float64)
 
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.previous_input,
                                                                          labels=y))
@@ -49,17 +49,18 @@ class ObservableNet:
         apply_operation = optimizer.apply_gradients(gradients)
 
         correct_prediction = tf.equal(tf.argmax(self.previous_input, axis=1), tf.argmax(y, axis=1))
-        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float64))
 
         self.y_ = y
         self.accuracy = accuracy
         return gradients, apply_operation, optimizer.variables()
 
-    def train(self, epochs, learning_rate=0.5, bad_training=False):
+    def train(self, epochs, learning_rate=0.2, bad_training=False):
         (complete_train_data, complete_train_labels), (self.test_data, self.test_labels) = mnist.load_data()
         complete_train_data = np.reshape(complete_train_data, [complete_train_data.shape[0], 784])
         self.test_data = np.reshape(self.test_data, [self.test_data.shape[0], 784])
-        norm = MinMaxScaler().fit_transform(np.concatenate((complete_train_data, self.test_data), axis=0))
+        norm = MinMaxScaler().fit_transform(np.concatenate((np.ndarray.astype(complete_train_data, np.float64),
+                                                            np.ndarray.astype(self.test_data, np.float64)), axis=0))
         complete_train_data = norm[:60000]
         self.test_data = norm[60000:]
 
@@ -68,9 +69,8 @@ class ObservableNet:
         np.random.seed(self.seed)
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
-        self.test_labels = self.sess.run(tf.one_hot(self.test_labels, depth=10, dtype=tf.int32))
-        print(complete_train_labels[:5])
-        complete_train_labels = self.sess.run(tf.one_hot(complete_train_labels, depth=10, dtype=tf.int32))
+        self.test_labels = self.sess.run(tf.one_hot(self.test_labels, depth=10, dtype=tf.float64))
+        complete_train_labels = self.sess.run(tf.one_hot(complete_train_labels, depth=10, dtype=tf.float64))
         indices = [index for index in range(60000)]
         for epoch in range(epochs):
             print('Starting epoch: ' + str(epoch))
