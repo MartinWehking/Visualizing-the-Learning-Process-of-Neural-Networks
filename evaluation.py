@@ -156,5 +156,5 @@ def load_results(path):
 
 
 if __name__ == "__main__":
-    start_kmeans_evaluation()
+    start_dbscan_evaluation()
     #load_results(getcwd()+'/results.csv')
