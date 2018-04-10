@@ -20,7 +20,7 @@ class Window(QtWidgets.QWidget):
         self.l1_from = self.l1_to = self.l2_from = self.l2_to = self.step = None
 
         self.layer = 0
-        self.epochs = 5
+        self.epochs = 10
         self.initialize_observable_net()
         self.vis = 'gradient'
 
@@ -54,12 +54,13 @@ class Window(QtWidgets.QWidget):
         main_group = QtWidgets.QGroupBox('Visualization Settings')
         setting_layout = QtWidgets.QVBoxLayout()
         setting_layout.setAlignment(QtCore.Qt.AlignTop)
+        main_group.setMaximumWidth(int(self.width() / 3.5))
         main_group.setLayout(setting_layout)
         h_box = QtWidgets.QHBoxLayout()
 
         center = QtWidgets.QGroupBox()
-        #center.setMinimumWidth((int(self.width() / 3)) * 2)
-        #main_group.setMaximumWidth(int(self.width() / 3))
+        # center.setMinimumWidth((int(self.width() / 3)) * 2)
+        # main_group.setMaximumWidth(int(self.width() / 3))
 
         left = QtWidgets.QVBoxLayout()
         left.addWidget(self.toolbar)
@@ -181,7 +182,6 @@ class Window(QtWidgets.QWidget):
 
         layout.addWidget(self.step)
 
-
         apply_button = QtWidgets.QPushButton('Apply')
         apply_button.pressed.connect(self.change_values)
         layout.addWidget(apply_button)
@@ -197,7 +197,6 @@ class Window(QtWidgets.QWidget):
         self.plot(l1_from=int(self.l1_from.text()),
                   l1_to=int(self.l1_to.text()), l2_from=int(self.l2_from.text()), l2_to=int(self.l2_to.text()),
                   step=int(self.step.text()))
-
 
     def get_display(self, vis, l1_from, l1_to, l2_from, l2_to, step):
         if vis == 'gradient':
@@ -219,10 +218,11 @@ class Window(QtWidgets.QWidget):
                 l1_to = l1_to + 1
             if l2_from == l2_to:
                 l2_to = l2_to + 1
-            display = display[l1_from:l1_to, l2_from *self.epochs:int(l2_to) * self.epochs]
-        if step > 1 and step < self.epochs:
-            #toDo fix
-          return np.delete(display, [i * self.epochs for i in range(int(display.shape[1] / self.epochs)) if i % step == 0])
+            display = display[l1_from:l1_to, l2_from * self.epochs:int(l2_to) * self.epochs]
+        if 1 < step < self.epochs:
+            return np.delete(display,
+                             [i for i in range(int(display.shape[1])) if i % step != 0],
+                             axis=1)
         else:
             return display
 
@@ -297,6 +297,6 @@ class Window(QtWidgets.QWidget):
 
 
 if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
-    app_window = Window()
-    sys.exit(app.exec_())
+     app = QtWidgets.QApplication(sys.argv)
+     app_window = Window()
+     sys.exit(app.exec_())
