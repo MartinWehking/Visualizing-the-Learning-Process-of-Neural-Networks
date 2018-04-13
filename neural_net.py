@@ -127,7 +127,7 @@ class ObservableNet:
                                                                     self.y_: self.val_labels})
         else:
             return self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data,
-                                                                    self.y_: self.val_labels})
+                                                                    self.y_: self.test_labels})
 
     def save_status(self):
         layers = tf.get_collection_ref(tf.GraphKeys.TRAINABLE_VARIABLES)
