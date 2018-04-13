@@ -2,9 +2,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from numpy.random import shuffle
-from keras.datasets import mnist
 from sklearn.cluster import DBSCAN
-from sklearn.preprocessing import MinMaxScaler
 
 
 class ObservableNet:
@@ -14,11 +12,7 @@ class ObservableNet:
         self.previous_input = self.first_input = tf.keras.Input(shape=[input_units], dtype=tf.float64)
         self.agg_gradients = None
         self.mini_batches = 100
-        self.y_ = None
-        self.accuracy = None
-        self.test_data = None
-        self.test_labels = None
-        self.sess = None
+        self.y_ = self.accuracy = self.val_data = self.val_labels = self.test_data = self.test_labels = self.sess = None
         self.restore_layers = list()
 
         self.gradients = pd.DataFrame(columns=['gradient', 'epoch', 'layer'])
@@ -28,19 +22,22 @@ class ObservableNet:
         if type == 'dense':
             if activation == 'relu':
                 self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.relu, name=name, use_bias=False,
-                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed, dtype=tf.float64))
+                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed,
+                                                                                                       dtype=tf.float64))
             elif activation == 'linear':
                 self.previous_input = tf.layers.dense(self.previous_input, units, name=name, use_bias=False,
-                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed, dtype=tf.float64))
+                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed,
+                                                                                                       dtype=tf.float64))
             elif activation == 'sigmoid':
                 self.previous_input = tf.layers.dense(self.previous_input, units, tf.nn.sigmoid,
                                                       name=name, use_bias=False,
-                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed, dtype=tf.float64))
+                                                      kernel_initializer=tf.glorot_uniform_initializer(seed=seed,
+                                                                                                       dtype=tf.float64))
             else:
                 raise AttributeError('Activation has to be relu, linear or sigmoid.')
 
     def create_net(self, learning_rate):
-        y = tf.placeholder(tf.int32)
+        y = tf.placeholder(tf.int32, shape=[None, 10])
 
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.previous_input,
                                                                          labels=y))
@@ -55,31 +52,32 @@ class ObservableNet:
         self.accuracy = accuracy
         return gradients, apply_operation, optimizer.variables()
 
-    def train(self, epochs, learning_rate=0.25, bad_training=False):
-        (complete_train_data, complete_train_labels), (self.test_data, self.test_labels) = mnist.load_data()
-        complete_train_data = np.reshape(complete_train_data, [complete_train_data.shape[0], 784])
-        self.test_data = np.reshape(self.test_data, [self.test_data.shape[0], 784])
-        norm = MinMaxScaler().fit_transform(np.concatenate((np.ndarray.astype(complete_train_data, np.float64),
-                                                            np.ndarray.astype(self.test_data, np.float64)), axis=0))
-        complete_train_data = norm[:60000]
-        self.test_data = norm[60000:]
+    def train(self, epochs, learning_rate=0.1, bad_training=False):
+        mnist = tf.contrib.learn.datasets.load_dataset("mnist")
+        self.val_labels = np.asarray(mnist.validation.labels, dtype=np.int32)
+        self.val_data = mnist.validation.images
+        complete_train_data = mnist.train.images  # Returns np.array
+        complete_train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
+        self.test_data = mnist.test.images  # Returns np.array
+        self.test_labels = np.asarray(mnist.test.labels, dtype=np.int32)
 
         gradients, apply_operation, variables = self.create_net(learning_rate)
 
         np.random.seed(self.seed)
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
+        self.val_labels = self.sess.run(tf.one_hot(self.val_labels, depth=10, dtype=tf.int32))
         self.test_labels = self.sess.run(tf.one_hot(self.test_labels, depth=10, dtype=tf.int32))
         complete_train_labels = self.sess.run(tf.one_hot(complete_train_labels, depth=10, dtype=tf.int32))
-        indices = [index for index in range(60000)]
+        indices = [index for index in range(55000)]
         for epoch in range(epochs):
             print('Starting epoch: ' + str(epoch))
             shuffle(indices)
             if bad_training:
-                random_label = [index for index in range(60000)]
+                random_label = [index for index in range(55000)]
                 shuffle(random_label)
             for i in range(self.mini_batches):
-                train_indices = indices[i * 600: (i + 1) * 600]
+                train_indices = indices[i * 550: (i + 1) * 550]
                 train_data = [complete_train_data[i] for i in train_indices]
                 if not bad_training:
                     train_labels = [complete_train_labels[i] for i in train_indices]
@@ -93,10 +91,12 @@ class ObservableNet:
                 self.accuracy.eval(session=self.sess, feed_dict={self.first_input: complete_train_data,
                                                                  self.y_: complete_train_labels})))
             print('testing ' + str(
-                self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data, self.y_:
-                    self.test_labels})))
+                self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.val_data, self.y_:
+                    self.val_labels})))
             self.save_weights(grad_weights, epoch)
             self.save_gradients(epoch)
+        print(str(self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data, self.y_:
+            self.test_labels})))
         return self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data, self.y_:
             self.test_labels})
 
@@ -121,9 +121,13 @@ class ObservableNet:
         weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)[layer]
         self.sess.run(weights[neuron, :].assign(tf.zeros(weights.shape[1], dtype=tf.float64)))
 
-    def test(self):
-        return self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data,
-                                                                self.y_: self.test_labels})
+    def test(self, testing=0):
+        if testing == 0:
+            return self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.val_data,
+                                                                    self.y_: self.val_labels})
+        else:
+            return self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data,
+                                                                    self.y_: self.val_labels})
 
     def save_status(self):
         layers = tf.get_collection_ref(tf.GraphKeys.TRAINABLE_VARIABLES)

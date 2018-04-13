@@ -17,10 +17,10 @@ class Window(QtWidgets.QWidget):
         self.observable_net = self.grad_displays = \
             self.weight_displays = self.weights = self.gradients = self.displays = None
 
-        self.l1_from = self.l1_to = self.l2_from = self.l2_to = self.step = None
+        self.l1_from = self.l1_to = self.l2_from = self.l2_to = self.step = self.adjust_value = None
 
         self.layer = 0
-        self.epochs = 10
+        self.epochs = 36
         self.initialize_observable_net()
         self.vis = 'gradient'
 
@@ -59,9 +59,6 @@ class Window(QtWidgets.QWidget):
         h_box = QtWidgets.QHBoxLayout()
 
         center = QtWidgets.QGroupBox()
-        # center.setMinimumWidth((int(self.width() / 3)) * 2)
-        # main_group.setMaximumWidth(int(self.width() / 3))
-
         left = QtWidgets.QVBoxLayout()
         left.addWidget(self.toolbar)
         left.addWidget(self.canvas)
@@ -100,7 +97,11 @@ class Window(QtWidgets.QWidget):
         self.plot()
 
     def adjust_mm(self):
-        return
+        value = self.adjust_value.text()
+        if value == '':
+            self.plot()
+        else:
+            self.plot(adjust_value=float(value))
 
     def change_to_combined(self):
         self.vis = 'combined'
@@ -117,6 +118,7 @@ class Window(QtWidgets.QWidget):
         return displays
 
     def init_settings(self, layout):
+
         vis_label = QtWidgets.QLabel('Properties:')
         layout.addWidget(vis_label)
 
@@ -166,7 +168,7 @@ class Window(QtWidgets.QWidget):
         l2_selection = QtWidgets.QGroupBox()
         l2_selection_box = QtWidgets.QHBoxLayout()
         self.l2_from = l2_from_selection = QtWidgets.QLineEdit('0')
-        self.l2_to = l2_to_selection = QtWidgets.QLineEdit('784')
+        self.l2_to = l2_to_selection = QtWidgets.QLineEdit('512')
         l2_selection.setLayout(l2_selection_box)
         l2_selection_box.addWidget(l2_from_selection)
         l2_selection_box.addWidget(QtWidgets.QLabel(':'))
@@ -190,8 +192,12 @@ class Window(QtWidgets.QWidget):
         draw_unclustered_vectors.pressed.connect(self.plot_time_vectors)
         layout.addWidget(draw_unclustered_vectors)
 
-        adjust = QtWidgets.QPushButton('Adjust Min/Max')
-        # adjust.pressed.connect()
+        self.adjust_value = QtWidgets.QLineEdit('')
+        layout.addWidget(self.adjust_value)
+
+        adjust = QtWidgets.QPushButton('Adjust')
+        adjust.pressed.connect(self.adjust_mm)
+        layout.addWidget(adjust)
 
     def change_values(self):
         self.plot(l1_from=int(self.l1_from.text()),
@@ -226,9 +232,11 @@ class Window(QtWidgets.QWidget):
         else:
             return display
 
-    def plot(self, adjust_min=None, adjust_max=None, l1_from=0, l1_to=None, l2_from=0, l2_to=None, step=1):
+    def plot(self, l1_from=0, l1_to=None, l2_from=0, l2_to=None, step=1, adjust_value=None):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
+        ax.clear()
+
         if self.layer == len(self.grad_displays) - 1:
             ax.set_xlabel('Output Layer')
         else:
@@ -237,16 +245,26 @@ class Window(QtWidgets.QWidget):
             ax.set_ylabel('Hidden Layer ' + str(self.layer - 1))
         else:
             ax.set_ylabel('Input Layer')
-        ax.clear()
-
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        v_min = v_max = None
 
         if self.vis is not 'combined':
             display = self.get_display(self.vis, l1_from, l1_to, l2_from, l2_to, step)
-            display = ax.imshow(display, aspect='auto', cmap='RdGy', interpolation='None',
-                                extent=[0, int(len(display[0]) / self.epochs), len(display), 0], vmin=adjust_min,
-                                vmax=adjust_max)
+            if adjust_value is None:
+                max_value = np.abs(np.max(display))
+                min_value = np.abs(np.min(display))
+                max_value = min_value = np.max([min_value, max_value])
+                max_value = np.sign(np.max(display)) * max_value
+                min_value = np.sign(np.min(display)) * min_value
+                v_min = min_value
+                v_max = max_value
+            else:
+                v_max = adjust_value
+                v_min = (-1) * adjust_value
+
+            display = ax.imshow(display, aspect='auto', cmap='RdBu', interpolation='None',
+                                extent=[0, int(len(display[0]) / self.epochs), len(display), 0], vmin=v_min, vmax=v_max)
 
             cb = self.figure.colorbar(display, shrink=0.5)
             cb.set_label(self.vis)
@@ -254,22 +272,16 @@ class Window(QtWidgets.QWidget):
             display_1 = self.get_display('gradient', l1_from, l1_to, l2_from, l2_to, step)
             display_2 = self.get_display('weight', l1_from, l1_to, l2_from, l2_to, step)
 
-            display_1 = ax.imshow(display_1, aspect='auto', cmap='RdGy', interpolation='None',
-                                  extent=[0, int(len(display_1[0]) / self.epochs), len(display_1), 0], vmin=adjust_min,
-                                  vmax=adjust_max)
+            display_1 = ax.imshow(display_1, aspect='auto', cmap='RdBu', interpolation='None',
+                                  extent=[0, int(len(display_1[0]) / self.epochs), len(display_1), 0], vmax=v_max,
+                                  vmin=v_min)
             cb = self.figure.colorbar(display_1, shrink=0.5)
             cb.set_label('gradient')
             display_2 = ax.imshow(display_2, aspect='auto', cmap='PuOr', interpolation='None',
-                                  extent=[0, int(len(display_2[0]) / self.epochs), len(display_2), 0], vmin=adjust_min,
-                                  vmax=adjust_max)
+                                  extent=[0, int(len(display_2[0]) / self.epochs), len(display_2), 0], vmin=v_min,
+                                  vmax=v_max)
             cb_2 = self.figure.colorbar(display_2, shrink=0.5)
             cb_2.set_label('weight')
-
-        # if self.vis == 'combined':
-        #    other_display = self.create_display(other_vectors, l1_from, l1_to, l2_from, l2_to)
-        #    other_display = ax.imshow(other_display, aspect='auto', cmap='PuOr', interpolation='None',
-        #                              extent=[0, int(len(image[0]) / self.epochs), len(image), 0], vmin=adjust_min,
-        #                             vmax=adjust_max)
         self.canvas.draw()
 
     def plot_time_vectors(self):
@@ -297,6 +309,6 @@ class Window(QtWidgets.QWidget):
 
 
 if __name__ == "__main__":
-     app = QtWidgets.QApplication(sys.argv)
-     app_window = Window()
-     sys.exit(app.exec_())
+    app = QtWidgets.QApplication(sys.argv)
+    app_window = Window()
+    sys.exit(app.exec_())
