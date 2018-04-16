@@ -141,6 +141,18 @@ def do_hac(i, net, time_vectors_weights):
             for result in results:
                 save_results(result[0], result[1], summed_vectors, label, i, x, 'w')
 
+def do_kmeans(i, net, time_vectors_weights):
+    i = i + 1
+    for x, layer in enumerate(time_vectors_weights[:-1]):
+        summed_vectors = sum_columns(layer)
+        label = KMeans(n_clusters=i, random_state=3125).fit_predict(summed_vectors)
+        results = remove_clusters_evaluate(label, summed_vectors, net, x)
+        if len(results) == 1:
+            save_results(results[0][0], 0, summed_vectors, label, i, x, 'w')
+        else:
+            for result in results:
+                save_results(result[0], result[1], summed_vectors, label, i, x, 'w')
+
 
 def save_results(removed_label, accuracy, summed_vectors, label, epsilon, layer, g_w):
     new_data = pd.DataFrame([(removed_label, accuracy, summed_vectors, label, epsilon, layer, g_w)], columns=columns)
@@ -181,7 +193,7 @@ if __name__ == "__main__":
     procs = []
     for i in range(50):
         net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
-        proc = Process(target=do_hac, args=(i, net, time_vectors_weights))
+        proc = Process(target=do_kmeans, args=(i, net, time_vectors_weights))
         procs.append(proc)
         proc.start()
 
