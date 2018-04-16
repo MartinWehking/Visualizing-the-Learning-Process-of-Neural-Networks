@@ -3,9 +3,13 @@ from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
 from multiprocessing import Process
 import pandas as pd
 from os import getcwd
+import logging
 
-dbscan_params = [1 * 10 ** ((-1) * (i + 1)) for i in range(10)] + [5 * 10 ** ((-1) * (i + 1)) for i in range(10)] \
-                + [2.5 * 10 ** ((-1) * (i + 1)) for i in range(10)] + [7.5 * 10 ** ((-1) * (i + 1)) for i in range(10)]
+dbscan_params_1 = [1 * 10 ** ((-1) * (i + 1)) for i in range(10)]
+dbscan_params_2 = [5 * 10 ** ((-1) * (i + 1)) for i in range(10)]
+dbscan_params_3 = [2.5 * 10 ** ((-1) * (i + 1)) for i in range(10)]
+dbscan_params_4 = [7.5 * 10 ** ((-1) * (i + 1)) for i in range(10)]
+dbscan_params = dbscan_params_1 + dbscan_params_2 + dbscan_params_3 + dbscan_params_4
 columns = ['removed_label', 'accuracy', 'summed_vectors', 'label', 'epsilon', 'layer', 'g_w']
 path = getcwd() + '/results.csv'
 path_layer = getcwd() + '/grads.csv'
@@ -52,7 +56,7 @@ def create_time_vectors():
 
 def start_dbscan_evaluation():
     net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
-    for epsilon in dbscan_params:
+    for epsilon in dbscan_params_1:
         for i, layer in enumerate(time_vectors_gradients[:-1]):
             summed_vectors = sum_columns(layer)
             label = DBSCAN(eps=epsilon).fit_predict(summed_vectors)
@@ -63,7 +67,7 @@ def start_dbscan_evaluation():
                 for result in results:
                     save_results(result[0], result[1], summed_vectors, label, epsilon, i, 'g')
 
-    for epsilon in dbscan_params:
+    for epsilon in dbscan_params_1:
         for i, layer in enumerate(time_vectors_weights[:-1]):
             summed_vectors = sum_columns(layer)
             label = DBSCAN(eps=epsilon).fit_predict(summed_vectors)
@@ -201,14 +205,13 @@ def remove_all():
 
 
 if __name__ == "__main__":
-    procs = []
-    for epsilon in dbscan_params:
-        net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
-        proc = Process(target=do_kmeans, args=(epsilon, net, time_vectors_weights))
-        procs.append(proc)
-        proc.start()
+    net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
+    for i in range(5):
+        i = i + 0
+        do_kmeans(i, net, time_vectors_weights)
+    logging.info('Done')
 
     # start_hac_evaluation()
-    # best_results(getcwd()+'/Results/DBSAN.csv')
+    #best_results(getcwd()+'/Results/DBSAN.csv')
     # best_results(getcwd()+'/Results/hac.csv')
     # best_results(getcwd()+'/Results/KMeans.csv')
