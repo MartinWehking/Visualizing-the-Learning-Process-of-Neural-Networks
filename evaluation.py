@@ -153,6 +153,17 @@ def do_kmeans(i, net, time_vectors_weights):
             for result in results:
                 save_results(result[0], result[1], summed_vectors, label, i, x, 'w')
 
+def do_dbscan(epsilon, net, time_vectors_weights):
+    for i, layer in enumerate(time_vectors_weights[:-1]):
+        summed_vectors = sum_columns(layer)
+        label = DBSCAN(eps=epsilon).fit_predict(summed_vectors)
+        if len(set(label)) == 1:
+            save_results(label[0], 0, summed_vectors, label, epsilon, i, 'w')
+        else:
+            results = remove_clusters_evaluate(label, summed_vectors, net, i)
+            for result in results:
+                save_results(result[0], result[1], summed_vectors, label, epsilon, i, 'w')
+
 
 def save_results(removed_label, accuracy, summed_vectors, label, epsilon, layer, g_w):
     new_data = pd.DataFrame([(removed_label, accuracy, summed_vectors, label, epsilon, layer, g_w)], columns=columns)
@@ -191,9 +202,9 @@ def remove_all():
 
 if __name__ == "__main__":
     procs = []
-    for i in range(50):
+    for epsilon in dbscan_params:
         net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
-        proc = Process(target=do_kmeans, args=(i, net, time_vectors_weights))
+        proc = Process(target=do_kmeans, args=(epsilon, net, time_vectors_weights))
         procs.append(proc)
         proc.start()
 
