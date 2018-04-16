@@ -3,7 +3,7 @@ import pandas as pd
 import tensorflow as tf
 from numpy.random import shuffle
 from sklearn.cluster import DBSCAN
-
+import matplotlib.pyplot as plt
 
 class ObservableNet:
     def __init__(self, input_units, seed=3125):
@@ -53,6 +53,7 @@ class ObservableNet:
         return gradients, apply_operation, optimizer.variables()
 
     def train(self, epochs, learning_rate=0.1, bad_training=False):
+        test_error = []
         mnist = tf.contrib.learn.datasets.load_dataset("mnist")
         self.val_labels = np.asarray(mnist.validation.labels, dtype=np.int32)
         self.val_data = mnist.validation.images
@@ -82,7 +83,7 @@ class ObservableNet:
                 if not bad_training:
                     train_labels = [complete_train_labels[i] for i in train_indices]
                 else:
-                    train_labels = [complete_train_labels[i] for i in random_label[i * 50: (i + 1) * 50]]
+                    train_labels = [complete_train_labels[i] for i in random_label[i * 550: (i + 1) * 550]]
                 grad_weights, s = self.sess.run([gradients, apply_operation],
                                                 feed_dict={self.first_input: train_data, self.y_:
                                                     train_labels})
@@ -93,10 +94,14 @@ class ObservableNet:
             print('testing ' + str(
                 self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.val_data, self.y_:
                     self.val_labels})))
+            test_error.append(self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.val_data, self.y_:
+                    self.val_labels}))
             self.save_weights(grad_weights, epoch)
             self.save_gradients(epoch)
         print(str(self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data, self.y_:
             self.test_labels})))
+        #plt.plot(range(epochs), test_error)
+        #plt.show()
         return self.accuracy.eval(session=self.sess, feed_dict={self.first_input: self.test_data, self.y_:
             self.test_labels})
 

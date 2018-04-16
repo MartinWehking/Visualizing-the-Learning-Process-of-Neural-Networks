@@ -1,5 +1,6 @@
 from neural_net import ObservableNet, sum_columns
 from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
+from multiprocessing import Process
 import pandas as pd
 from os import getcwd
 
@@ -106,12 +107,12 @@ def start_hac_evaluation():
     for i in range(70):
         i = i + 1
         for x, layer in enumerate(time_vectors_gradients[:-1]):
-              summed_vectors = sum_columns(layer)
-              label = AgglomerativeClustering(n_clusters=i).fit_predict(summed_vectors)
-              results = remove_clusters_evaluate(label, summed_vectors, net, x)
-              if len(results) == 1:
+            summed_vectors = sum_columns(layer)
+            label = AgglomerativeClustering(n_clusters=i).fit_predict(summed_vectors)
+            results = remove_clusters_evaluate(label, summed_vectors, net, x)
+            if len(results) == 1:
                 save_results(results[0][0], 0, summed_vectors, label, i, x, 'g')
-              else:
+            else:
                 for result in results:
                     save_results(result[0], result[1], summed_vectors, label, i, x, 'g')
 
@@ -126,6 +127,19 @@ def start_hac_evaluation():
             else:
                 for result in results:
                     save_results(result[0], result[1], summed_vectors, label, i, x, 'w')
+
+
+def do_hac(i, net, time_vectors_weights):
+    i = i + 1
+    for x, layer in enumerate(time_vectors_weights[:-1]):
+        summed_vectors = sum_columns(layer)
+        label = AgglomerativeClustering(n_clusters=i).fit_predict(summed_vectors)
+        results = remove_clusters_evaluate(label, summed_vectors, net, x)
+        if len(results) == 1:
+            save_results(results[0][0], 0, summed_vectors, label, i, x, 'w')
+        else:
+            for result in results:
+                save_results(result[0], result[1], summed_vectors, label, i, x, 'w')
 
 
 def save_results(removed_label, accuracy, summed_vectors, label, epsilon, layer, g_w):
@@ -150,11 +164,28 @@ def create_dataset():
     dataset.to_csv(path, index=False)
 
 
-def load_results(path):
+def best_results(path):
     results = pd.read_csv(path)
-    print()
+    best_acc = results.groupby('layer')['accuracy'].max()
+    b_r = pd.DataFrame(columns=results.columns)
+    for acc in best_acc:
+        b_r = b_r.append(results.loc[acc == results.accuracy])
+    print(b_r)
+
+
+def remove_all():
+    net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
 
 
 if __name__ == "__main__":
-    start_hac_evaluation()
-    #load_results(getcwd()+'/results.csv')
+    procs = []
+    for i in range(50):
+        net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
+        proc = Process(target=do_hac, args=(i, net, time_vectors_weights))
+        procs.append(proc)
+        proc.start()
+
+    # start_hac_evaluation()
+    # best_results(getcwd()+'/Results/DBSAN.csv')
+    # best_results(getcwd()+'/Results/hac.csv')
+    # best_results(getcwd()+'/Results/KMeans.csv')

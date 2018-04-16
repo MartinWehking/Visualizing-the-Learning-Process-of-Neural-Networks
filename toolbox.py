@@ -6,6 +6,7 @@ from matplotlib.ticker import MaxNLocator
 from matplotlib import pyplot as plt
 
 import sys
+import math
 import numpy as np
 
 from neural_net import ObservableNet, sum_columns
@@ -17,11 +18,13 @@ class Window(QtWidgets.QWidget):
         self.observable_net = self.grad_displays = \
             self.weight_displays = self.weights = self.gradients = self.displays = None
 
-        self.l1_from = self.l1_to = self.l2_from = self.l2_to = self.step = self.adjust_value = None
+        self.l1_from = self.l1_to = self.l2_from = self.l2_to = self.step = self.adjust_value = \
+            self.grad_vectors = self.weight_vectors = None
 
         self.layer = 0
         self.epochs = 36
         self.initialize_observable_net()
+        self.ad_value = None
         self.vis = 'gradient'
 
         self.figure = Figure()
@@ -42,10 +45,13 @@ class Window(QtWidgets.QWidget):
 
         self.weights = observable_net.weights
         self.gradients = observable_net.gradients
-        self.grad_displays = self.create_displays([observable_net.create_time_vectors
-                                                   ('gradient', layer) for layer in range(5)])
-        self.weight_displays = self.create_displays([observable_net.create_time_vectors
-                                                     ('weight', layer) for layer in range(5)])
+
+        self.grad_vectors = [observable_net.create_time_vectors
+                             ('gradient', layer) for layer in range(5)]
+        self.weight_vectors = [observable_net.create_time_vectors
+                               ('weight', layer) for layer in range(5)]
+        self.grad_displays = self.create_displays(self.grad_vectors)
+        self.weight_displays = self.create_displays(self.weight_vectors)
 
     def init_ui(self):
         self.setMinimumHeight(500)
@@ -97,11 +103,8 @@ class Window(QtWidgets.QWidget):
         self.plot()
 
     def adjust_mm(self):
-        value = self.adjust_value.text()
-        if value == '':
-            self.plot()
-        else:
-            self.plot(adjust_value=float(value))
+        self.ad_value = float(self.adjust_value.text())
+        self.plot()
 
     def change_to_combined(self):
         self.vis = 'combined'
@@ -112,6 +115,7 @@ class Window(QtWidgets.QWidget):
         for layer in range(len(time_vectors)):
             display = list()
             for row in time_vectors[layer]:
+                # row = MinMaxScaler().fit_transform(row)
                 x = row.flatten()
                 display.append(x)
             displays.append(np.array(display))
@@ -150,9 +154,9 @@ class Window(QtWidgets.QWidget):
             if item == 0:
                 layer_items.append('Input - Hidden 1')
             elif item == len(self.weights['layer'].unique()) - 1:
-                layer_items.append('Hidden ' + str(item - 1) + ' - Output')
+                layer_items.append('Hidden ' + str(item) + ' - Output')
             else:
-                layer_items.append('Hidden ' + str(item - 1) + ' - Hidden ' + str(item))
+                layer_items.append('Hidden ' + str(item) + ' - Hidden ' + str(item + 1))
         layer_selection.addItems(layer_items)
         layer_selection.currentIndexChanged.connect(self.change_layer)
 
@@ -203,8 +207,9 @@ class Window(QtWidgets.QWidget):
         self.plot(l1_from=int(self.l1_from.text()),
                   l1_to=int(self.l1_to.text()), l2_from=int(self.l2_from.text()), l2_to=int(self.l2_to.text()),
                   step=int(self.step.text()))
+        self.ad_value = None
 
-    def get_display(self, vis, l1_from, l1_to, l2_from, l2_to, step):
+    def get_display(self, vis, l1_from, l1_to, l2_from, l2_to, step, remove_first=False):
         if vis == 'gradient':
             display = self.grad_displays[self.layer]
         else:
@@ -225,14 +230,19 @@ class Window(QtWidgets.QWidget):
             if l2_from == l2_to:
                 l2_to = l2_to + 1
             display = display[l1_from:l1_to, l2_from * self.epochs:int(l2_to) * self.epochs]
+        new_len = self.epochs
         if 1 < step < self.epochs:
-            return np.delete(display,
-                             [i for i in range(int(display.shape[1])) if i % step != 0],
-                             axis=1)
-        else:
-            return display
+            display = np.delete(display,
+                                [i for i in range(int(display.shape[1])) if i % step != 0],
+                                axis=1)
+            new_len = math.ceil(new_len / step)
+        if remove_first:
+            display = np.delete(display,
+                                [i for i in range(int(display.shape[1])) if i % new_len == 0],
+                                axis=1)
+        return display
 
-    def plot(self, l1_from=0, l1_to=None, l2_from=0, l2_to=None, step=1, adjust_value=None):
+    def plot(self, l1_from=0, l1_to=None, l2_from=0, l2_to=None, step=1):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
         ax.clear()
@@ -240,34 +250,44 @@ class Window(QtWidgets.QWidget):
         if self.layer == len(self.grad_displays) - 1:
             ax.set_xlabel('Output Layer')
         else:
-            ax.set_xlabel('Hidden Layer ' + str(self.layer))
+            ax.set_xlabel('Hidden Layer ' + str(self.layer + 1))
         if self.layer > 0:
-            ax.set_ylabel('Hidden Layer ' + str(self.layer - 1))
+            ax.set_ylabel('Hidden Layer ' + str(self.layer))
         else:
             ax.set_ylabel('Input Layer')
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         v_min = v_max = None
 
+        if self.vis == 'gradient':
+            cmap = 'RdBu_r'
+        else:
+            cmap = 'viridis'
+
         if self.vis is not 'combined':
             display = self.get_display(self.vis, l1_from, l1_to, l2_from, l2_to, step)
-            if adjust_value is None:
-                max_value = np.abs(np.max(display))
-                min_value = np.abs(np.min(display))
-                max_value = min_value = np.max([min_value, max_value])
-                max_value = np.sign(np.max(display)) * max_value
-                min_value = np.sign(np.min(display)) * min_value
-                v_min = min_value
-                v_max = max_value
-            else:
-                v_max = adjust_value
-                v_min = (-1) * adjust_value
 
-            display = ax.imshow(display, aspect='auto', cmap='RdBu', interpolation='None',
+            if self.ad_value is None:
+                if self.vis == 'gradient':
+                    max_value = np.abs(np.max(display))
+                    min_value = np.abs(np.min(display))
+                    max_value = min_value = np.max([min_value, max_value])
+                    max_value = np.sign(np.max(display)) * max_value
+                    min_value = np.sign(np.min(display)) * min_value
+                    v_min = min_value
+                    v_max = max_value
+            else:
+                v_max = self.ad_value
+                v_min = (-1) * self.ad_value
+
+            display = ax.imshow(display, aspect='auto', cmap=cmap, interpolation='None',
                                 extent=[0, int(len(display[0]) / self.epochs), len(display), 0], vmin=v_min, vmax=v_max)
 
             cb = self.figure.colorbar(display, shrink=0.5)
-            cb.set_label(self.vis)
+            if self.vis == 'gradient':
+                cb.set_label('Gradient')
+            else:
+                cb.set_label('Weight')
         else:
             display_1 = self.get_display('gradient', l1_from, l1_to, l2_from, l2_to, step)
             display_2 = self.get_display('weight', l1_from, l1_to, l2_from, l2_to, step)
