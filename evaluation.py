@@ -208,7 +208,7 @@ if __name__ == "__main__":
     net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
     for i in range(5):
         i = i + 0
-        do_kmeans(i, net, time_vectors_weights)
+        do_hac(i, net, time_vectors_weights)
     logging.info('Done')
 
     # start_hac_evaluation()
