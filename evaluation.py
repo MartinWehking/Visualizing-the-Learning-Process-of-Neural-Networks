@@ -133,29 +133,31 @@ def start_hac_evaluation():
                     save_results(result[0], result[1], summed_vectors, label, i, x, 'w')
 
 
-def do_hac(i, net, time_vectors_weights):
+def do_hac(i, net, time_vectors_gradients):
     i = i + 1
-    for x, layer in enumerate(time_vectors_weights[:-1]):
+    for x, layer in enumerate(time_vectors_gradients[:-1]):
         summed_vectors = sum_columns(layer)
         label = AgglomerativeClustering(n_clusters=i).fit_predict(summed_vectors)
         results = remove_clusters_evaluate(label, summed_vectors, net, x)
         if len(results) == 1:
-            save_results(results[0][0], 0, summed_vectors, label, i, x, 'w')
+            save_results(results[0][0], 0, summed_vectors, label, i, x, 'g')
         else:
             for result in results:
-                save_results(result[0], result[1], summed_vectors, label, i, x, 'w')
+                save_results(result[0], result[1], summed_vectors, label, i, x, 'g')
 
-def do_kmeans(i, net, time_vectors_weights):
+
+def do_kmeans(i, net, time_vectors_gradients):
     i = i + 1
-    for x, layer in enumerate(time_vectors_weights[:-1]):
+    for x, layer in enumerate(time_vectors_gradients[:-1]):
         summed_vectors = sum_columns(layer)
         label = KMeans(n_clusters=i, random_state=3125).fit_predict(summed_vectors)
         results = remove_clusters_evaluate(label, summed_vectors, net, x)
         if len(results) == 1:
-            save_results(results[0][0], 0, summed_vectors, label, i, x, 'w')
+            save_results(results[0][0], 0, summed_vectors, label, i, x, 'g')
         else:
             for result in results:
-                save_results(result[0], result[1], summed_vectors, label, i, x, 'w')
+                save_results(result[0], result[1], summed_vectors, label, i, x, 'g')
+
 
 def do_dbscan(epsilon, net, time_vectors_weights):
     for i, layer in enumerate(time_vectors_weights[:-1]):
@@ -197,7 +199,7 @@ def best_results(path):
     b_r = pd.DataFrame(columns=results.columns)
     for acc in best_acc:
         b_r = b_r.append(results.loc[acc == results.accuracy])
-    print(b_r)
+    print(max(b_r['epsilon']))
 
 
 def remove_all():
@@ -206,12 +208,12 @@ def remove_all():
 
 if __name__ == "__main__":
     net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
-    for i in range(5):
-        i = i + 0
-        do_hac(i, net, time_vectors_weights)
-    logging.info('Done')
+    for i in range(10):
+        i = i + 20
+        do_kmeans(i, net, time_vectors_gradients)
+    print('Done')
 
     # start_hac_evaluation()
-    #best_results(getcwd()+'/Results/DBSAN.csv')
+    # best_results(getcwd()+'/Results/DBSAN.csv')
     # best_results(getcwd()+'/Results/hac.csv')
     # best_results(getcwd()+'/Results/KMeans.csv')
