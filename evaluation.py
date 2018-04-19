@@ -2,7 +2,7 @@ from neural_net import ObservableNet, sum_columns
 from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
 from multiprocessing import Process
 import pandas as pd
-from os import getcwd
+from os import getcwd, path
 import logging
 
 dbscan_params_1 = [1 * 10 ** ((-1) * (i + 1)) for i in range(10)]
@@ -11,7 +11,7 @@ dbscan_params_3 = [2.5 * 10 ** ((-1) * (i + 1)) for i in range(10)]
 dbscan_params_4 = [7.5 * 10 ** ((-1) * (i + 1)) for i in range(10)]
 dbscan_params = dbscan_params_1 + dbscan_params_2 + dbscan_params_3 + dbscan_params_4
 columns = ['removed_label', 'accuracy', 'summed_vectors', 'label', 'epsilon', 'layer', 'g_w']
-path = getcwd() + '/results.csv'
+dir = getcwd() + '/results.csv'
 path_layer = getcwd() + '/grads.csv'
 path_layer2 = getcwd() + '/weights.csv'
 
@@ -173,7 +173,7 @@ def do_dbscan(epsilon, net, time_vectors_weights):
 
 def save_results(removed_label, accuracy, summed_vectors, label, epsilon, layer, g_w):
     new_data = pd.DataFrame([(removed_label, accuracy, summed_vectors, label, epsilon, layer, g_w)], columns=columns)
-    with open(path, 'a') as f:
+    with open(dir, 'a') as f:
         new_data.to_csv(f, header=False, index=False)
 
 
@@ -190,30 +190,49 @@ def save_layer(layers, test, grads=True):
 
 def create_dataset():
     dataset = pd.DataFrame(columns=columns)
-    dataset.to_csv(path, index=False)
+    dataset.to_csv(dir, index=False)
 
 
 def best_results(path):
     results = pd.read_csv(path)
+    results = results.loc[results['g_w'] == 'w']
     best_acc = results.groupby('layer')['accuracy'].max()
     b_r = pd.DataFrame(columns=results.columns)
     for acc in best_acc:
         b_r = b_r.append(results.loc[acc == results.accuracy])
-    print(max(b_r['epsilon']))
+    b_r = b_r.groupby(['layer', 'g_w'])['epsilon'].max()
+    print(b_r)
 
 
 def remove_all():
     net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
 
+def merge_all():
+    hac_all = pd.read_csv(getcwd()+'/Results/hac.csv')
+    for i in [x for x in range(47) if x % 5 == 0]:
+        if path.isfile(getcwd()+'/Results17.04/Hac_g'+str(i)+'.csv'):
+            hac_all = hac_all.append(pd.read_csv(getcwd()+'/Results17.04/Hac_g'+str(i)+'.csv'))
+        if path.isfile(getcwd() + '/Results17.04/Hac_w' + str(i)+'.csv'):
+            hac_all = hac_all.append(pd.read_csv(getcwd() + '/Results17.04/Hac_w' + str(i) + '.csv'))
+    kmeans_all = pd.read_csv(getcwd()+'/Results/KMeans.csv')
+    for i in [x for x in range(47) if x % 5 == 0]:
+        if path.isfile(getcwd()+'/Results17.04/KMeans_g'+str(i)):
+            kmeans_all = kmeans_all.append(pd.read_csv(getcwd()+'/Results17.04/KMeans_g'+str(i)+'.csv'))
+        if path.isfile(getcwd() + '/Results17.04/KMeans_w' + str(i)+'.csv'):
+            kmeans_all = kmeans_all.append(pd.read_csv(getcwd() + '/Results17.04/KMeans_w' + str(i) + '.csv'))
+    hac_all.to_csv(getcwd()+'/Results/Hac_all.csv')
+    kmeans_all.to_csv(getcwd()+'/Results/KMeans_all.csv')
+
 
 if __name__ == "__main__":
-    net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
-    for i in range(10):
-        i = i + 20
-        do_kmeans(i, net, time_vectors_gradients)
-    print('Done')
+    #net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
+    #for i in range(10):
+    #    i = i + 20
+    #    do_kmeans(i, net, time_vectors_gradients)
+    #print('Done')
+    #merge_all()
 
     # start_hac_evaluation()
-    # best_results(getcwd()+'/Results/DBSAN.csv')
-    # best_results(getcwd()+'/Results/hac.csv')
-    # best_results(getcwd()+'/Results/KMeans.csv')
+     best_results(getcwd()+'/Results/DBSAN.csv')
+     #best_results(getcwd()+'/Results/Hac_all.csv')
+    #best_results(getcwd()+'/Results/KMeans_all.csv')
