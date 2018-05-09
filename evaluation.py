@@ -3,6 +3,8 @@ from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
 from multiprocessing import Process
 import pandas as pd
 from os import getcwd, path
+from matplotlib import pyplot as plt
+from sklearn.decomposition import PCA
 import logging
 
 dbscan_params_1 = [1 * 10 ** ((-1) * (i + 1)) for i in range(10)]
@@ -28,6 +30,12 @@ def remove_clusters_evaluate(label, vectors, observable_net, layer):
         results.append((l, eval))
         observable_net.reset()
     return results
+
+def remove_specific(label, observable_net, layer, remove_label=0):
+    for i, l in enumerate(label):
+        if l == remove_label:
+            observable_net.remove_neuron(layer + 1, i)
+
 
 
 def create_ref_architecture():
@@ -195,44 +203,93 @@ def create_dataset():
 
 def best_results(path):
     results = pd.read_csv(path)
-    results = results.loc[results['g_w'] == 'w']
+    results = results.loc[results['g_w'] == 'g']
     best_acc = results.groupby('layer')['accuracy'].max()
     b_r = pd.DataFrame(columns=results.columns)
     for acc in best_acc:
         b_r = b_r.append(results.loc[acc == results.accuracy])
-    b_r = b_r.groupby(['layer', 'g_w'])['epsilon'].max()
+    b_r = b_r.groupby(['layer', 'g_w'])['epsilon'].min()
     print(b_r)
 
 
-def remove_all():
-    net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
+def reproduce_result(layer, param, net, time_vectors_gradients, time_vectors_weights,
+                     grad=1, clustering='dbscan', remove_label=0):
+    if clustering == 'dbscan':
+        if grad == 1:
+            label = DBSCAN(param).fit_predict(sum_columns(time_vectors_gradients[layer]))
+        else:
+            label = DBSCAN(param).fit_predict(sum_columns(time_vectors_weights[layer]))
+    elif clustering == 'kmeans':
+        if grad == 1:
+            label = KMeans(param).fit_predict(sum_columns(time_vectors_gradients[layer]))
+        else:
+            label = KMeans(param).fit_predict(sum_columns(time_vectors_weights[layer]))
+    elif clustering == 'hac':
+        if grad == 1:
+            label = AgglomerativeClustering(param).fit_predict(sum_columns(time_vectors_gradients[layer]))
+        else:
+            label = AgglomerativeClustering(param).fit_predict(sum_columns(time_vectors_weights[layer]))
+    else:
+        raise ValueError('clustering param unknown')
+    if grad == 1:
+        remove_specific(label, net, layer, remove_label=remove_label)
+    else:
+        remove_specific(label, net, layer, remove_label=remove_label)
+
 
 def merge_all():
-    hac_all = pd.read_csv(getcwd()+'/Results/hac.csv')
+    hac_all = pd.read_csv(getcwd() + '/Results/hac.csv')
     for i in [x for x in range(47) if x % 5 == 0]:
-        if path.isfile(getcwd()+'/Results17.04/Hac_g'+str(i)+'.csv'):
-            hac_all = hac_all.append(pd.read_csv(getcwd()+'/Results17.04/Hac_g'+str(i)+'.csv'))
-        if path.isfile(getcwd() + '/Results17.04/Hac_w' + str(i)+'.csv'):
+        if path.isfile(getcwd() + '/Results17.04/Hac_g' + str(i) + '.csv'):
+            hac_all = hac_all.append(pd.read_csv(getcwd() + '/Results17.04/Hac_g' + str(i) + '.csv'))
+        if path.isfile(getcwd() + '/Results17.04/Hac_w' + str(i) + '.csv'):
             hac_all = hac_all.append(pd.read_csv(getcwd() + '/Results17.04/Hac_w' + str(i) + '.csv'))
-    kmeans_all = pd.read_csv(getcwd()+'/Results/KMeans.csv')
+    kmeans_all = pd.read_csv(getcwd() + '/Results/KMeans.csv')
     for i in [x for x in range(47) if x % 5 == 0]:
-        if path.isfile(getcwd()+'/Results17.04/KMeans_g'+str(i)):
-            kmeans_all = kmeans_all.append(pd.read_csv(getcwd()+'/Results17.04/KMeans_g'+str(i)+'.csv'))
-        if path.isfile(getcwd() + '/Results17.04/KMeans_w' + str(i)+'.csv'):
+        if path.isfile(getcwd() + '/Results17.04/KMeans_g' + str(i)):
+            kmeans_all = kmeans_all.append(pd.read_csv(getcwd() + '/Results17.04/KMeans_g' + str(i) + '.csv'))
+        if path.isfile(getcwd() + '/Results17.04/KMeans_w' + str(i) + '.csv'):
             kmeans_all = kmeans_all.append(pd.read_csv(getcwd() + '/Results17.04/KMeans_w' + str(i) + '.csv'))
-    hac_all.to_csv(getcwd()+'/Results/Hac_all.csv')
-    kmeans_all.to_csv(getcwd()+'/Results/KMeans_all.csv')
+    hac_all.to_csv(getcwd() + '/Results/Hac_all.csv')
+    kmeans_all.to_csv(getcwd() + '/Results/KMeans_all.csv')
+
+def plot_time_vectors(summed_vectors, clustered=False):
+
+        label = DBSCAN(0.025).fit_predict(summed_vectors)
+        summed_vectors = PCA().fit_transform(summed_vectors)
+        cmap = []
+        for l in label:
+            if l == 0:
+              cmap.append('r')
+            else:
+                cmap.append('k')
+        plt.scatter(summed_vectors[:, 0], summed_vectors[:, 1], c=cmap)
+        plt.show()
 
 
 if __name__ == "__main__":
-    #net, time_vectors_gradients, time_vectors_weights = create_time_vectors()
-    #for i in range(10):
+    net, tg, tw = create_time_vectors()
+    # for i in range(10):
     #    i = i + 20
     #    do_kmeans(i, net, time_vectors_gradients)
-    #print('Done')
-    #merge_all()
+    # print('Done')
+    # merge_all()
 
     # start_hac_evaluation()
-     best_results(getcwd()+'/Results/DBSAN.csv')
-     #best_results(getcwd()+'/Results/Hac_all.csv')
-    #best_results(getcwd()+'/Results/KMeans_all.csv')
+    #best_results(getcwd() + '/Results/Hac_all.csv')
+    #l = 1
+    #reproduce_result(0, 0.025, net, tg, tw)
+    #reproduce_result(1, 48, net, tg, tw, clustering='hac', remove_label=46)
+    #reproduce_result(2, 46, net, tg, tw, clustering='hac', remove_label=22)
+    reproduce_result(3, 22, net, tg, tw, clustering='hac', remove_label=18)
+
+    print(net.test(testing=0))
+    print(net.test(testing=1))
+
+    #plot_time_vectors(sum_columns(tg[0]))
+    #plot_time_vectors(sum_columns(tg[1]))
+    #plot_time_vectors(sum_columns(tg[2]))
+    #plot_time_vectors(sum_columns(tg[3]))
+
+# best_results(getcwd()+'/Results/Hac_all.csv')
+# best_results(getcwd()+'/Results/KMeans_all.csv')

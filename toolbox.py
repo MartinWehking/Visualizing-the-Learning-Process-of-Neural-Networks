@@ -9,7 +9,7 @@ import sys
 import math
 import numpy as np
 
-from neural_net import ObservableNet, sum_columns
+from neural_net import ObservableNet
 
 
 class Window(QtWidgets.QWidget):
@@ -22,7 +22,9 @@ class Window(QtWidgets.QWidget):
             self.grad_vectors = self.weight_vectors = None
 
         self.layer = 0
-        self.epochs = 36
+        self.epochs = 10
+        self.delete_x = 0
+        self.delete_y = 0
         self.initialize_observable_net()
         self.ad_value = None
         self.vis = 'gradient'
@@ -68,7 +70,6 @@ class Window(QtWidgets.QWidget):
         left = QtWidgets.QVBoxLayout()
         left.addWidget(self.toolbar)
         left.addWidget(self.canvas)
-        self.init_bottom(left)
         center.setLayout(left)
         self.init_settings(setting_layout)
 
@@ -76,12 +77,8 @@ class Window(QtWidgets.QWidget):
         h_box.addWidget(main_group)
 
         self.setLayout(h_box)
-        self.plot()
+        self.plot(d_first=True)
         self.show()
-
-    def init_bottom(self, layout):
-        show_net = QtWidgets.QPushButton('Neural Network Settings')
-        layout.addWidget(show_net)
 
     def change_layer(self, value):
         self.layer = value
@@ -141,8 +138,8 @@ class Window(QtWidgets.QWidget):
         h_box.addWidget(second)
 
         third = QtWidgets.QRadioButton('Combination')
-        third.toggled.connect(self.change_to_combined)
-        h_box.addWidget(third)
+        #third.toggled.connect(self.change_to_combined)
+        #h_box.addWidget(third)
 
         layer_label = QtWidgets.QLabel('Layer:')
         layout.addWidget(layer_label)
@@ -192,10 +189,6 @@ class Window(QtWidgets.QWidget):
         apply_button.pressed.connect(self.change_values)
         layout.addWidget(apply_button)
 
-        draw_unclustered_vectors = QtWidgets.QPushButton('Draw Time-Vectors')
-        draw_unclustered_vectors.pressed.connect(self.plot_time_vectors)
-        layout.addWidget(draw_unclustered_vectors)
-
         self.adjust_value = QtWidgets.QLineEdit('')
         layout.addWidget(self.adjust_value)
 
@@ -214,6 +207,18 @@ class Window(QtWidgets.QWidget):
             display = self.grad_displays[self.layer]
         else:
             display = self.weight_displays[self.layer]
+        if self.vis=='weight':
+          self.delete_x = np.min(display)
+          self.delete_y = np.max(display)
+        else:
+            max_value = np.abs(np.max(display))
+            min_value = np.abs(np.min(display))
+            max_value = min_value = np.max([min_value, max_value])
+            max_value = np.sign(np.max(display)) * max_value
+            min_value = np.sign(np.min(display)) * min_value
+            self.delete_x = min_value
+            self.delete_y = max_value
+
         if l1_from is None:
             l1_from = 0
         if l2_from is None:
@@ -242,10 +247,11 @@ class Window(QtWidgets.QWidget):
                                 axis=1)
         return display
 
-    def plot(self, l1_from=0, l1_to=None, l2_from=0, l2_to=None, step=1):
+    def plot(self, l1_from=0, l1_to=None, l2_from=0, l2_to=None, step=1, d_first=False):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
         ax.clear()
+        plt.tick_params(labelsize=20)
 
         if self.layer == len(self.grad_displays) - 1:
             ax.set_xlabel('Output Layer')
@@ -276,16 +282,18 @@ class Window(QtWidgets.QWidget):
                     min_value = np.sign(np.min(display)) * min_value
                     v_min = min_value
                     v_max = max_value
+
             else:
                 v_max = self.ad_value
                 v_min = (-1) * self.ad_value
 
             display = ax.imshow(display, aspect='auto', cmap=cmap, interpolation='None',
-                                extent=[0, int(len(display[0]) / self.epochs), len(display), 0], vmin=v_min, vmax=v_max)
+                                extent=[0, int(len(display[0]) / self.epochs), len(display), 0], vmin=v_min,
+                                vmax=v_max)
 
-            cb = self.figure.colorbar(display, shrink=0.5)
+            cb = self.figure.colorbar(display)
             if self.vis == 'gradient':
-                cb.set_label('Gradient')
+               cb.set_label('Gradient')
             else:
                 cb.set_label('Weight')
         else:
@@ -302,21 +310,6 @@ class Window(QtWidgets.QWidget):
                                   vmax=v_max)
             cb_2 = self.figure.colorbar(display_2, shrink=0.5)
             cb_2.set_label('weight')
-        self.canvas.draw()
-
-    def plot_time_vectors(self):
-        self.figure.clear()
-        ax = self.figure.add_subplot(111)
-        ax.clear()
-
-        if self.vis == 'gradient':
-            tl = self.time_vectors_gradients[self.layer]
-        else:
-            tl = self.time_vectors_weights[self.layer]
-
-        summed_vectors = sum_columns(tl)
-        ax.scatter(summed_vectors[:, 0], summed_vectors[:, 1])
-        ax.scatter(summed_vectors[:, 0], summed_vectors[:, 1])
         self.canvas.draw()
 
     def visualize_time_vectors(self, layer):
